@@ -1,0 +1,6 @@
+setup.py
+astrobridge.egg-info/PKG-INFO
+astrobridge.egg-info/SOURCES.txt
+astrobridge.egg-info/dependency_links.txt
+astrobridge.egg-info/requires.txt
+astrobridge.egg-info/top_level.txt

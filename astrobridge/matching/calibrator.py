@@ -30,7 +30,7 @@ class MatcherCalibrator:
         
         # Extract predicted matches
         predicted_set = set(
-            (m.source_ref, m.source_match) for m in matches
+            (m.source1_id, m.source2_id) for m in matches
         )
         
         # Compute metrics
@@ -64,7 +64,7 @@ class MatcherCalibrator:
         matches: List[MatchResult]
     ) -> Dict[str, float]:
         """
-        Compute statistics on match position significances.
+        Compute statistics on match separation distances.
         
         Args:
             matches: List of MatchResult objects
@@ -75,14 +75,17 @@ class MatcherCalibrator:
         if not matches:
             return {}
         
-        significances = [m.position_significance for m in matches]
+        separations = [m.separation_arcsec for m in matches]
         probabilities = [m.match_probability for m in matches]
+        confidences = [m.confidence for m in matches]
         
         return {
-            "position_sig_mean": float(np.mean(significances)),
-            "position_sig_std": float(np.std(significances)),
-            "position_sig_min": float(np.min(significances)),
-            "position_sig_max": float(np.max(significances)),
+            "separation_mean": float(np.mean(separations)),
+            "separation_std": float(np.std(separations)),
+            "separation_min": float(np.min(separations)),
+            "separation_max": float(np.max(separations)),
             "match_prob_mean": float(np.mean(probabilities)),
-            "match_prob_std": float(np.std(probabilities))
+            "match_prob_std": float(np.std(probabilities)),
+            "confidence_mean": float(np.mean(confidences)),
+            "confidence_std": float(np.std(confidences))
         }

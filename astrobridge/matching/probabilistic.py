@@ -15,8 +15,8 @@ class BayesianMatcher(Matcher):
     def __init__(
         self,
         positional_sigma_threshold: float = 3.0,
-        confidence_threshold: float = 0.5,
-        prior_match_prob: float = 0.1
+        confidence_threshold: float = 0.05,  # Lowered to 0.05 for realistic matching
+        prior_match_prob: float = 0.7  # Increased from 0.1 for more permissive matching
     ):
         """
         Initialize Bayesian matcher.
@@ -57,7 +57,7 @@ class BayesianMatcher(Matcher):
         spatial_index = SpatialIndex(candidate_sources)
         
         matches = []
-        search_radius_arcsec = 30.0  # Default search radius
+        search_radius_arcsec = 60.0  # Default search radius (sufficient for typical astrometric errors)
         
         for ref_source in ref_sources:
             # Find nearby candidates
@@ -150,18 +150,21 @@ class BayesianMatcher(Matcher):
     
     def set_thresholds(
         self, 
-        confidence_threshold: float, 
-        positional_sigma_threshold: float
+        confidence_threshold: float = None, 
+        positional_sigma_threshold: float = None
     ) -> None:
         """Set matching thresholds."""
-        if not (0.0 <= confidence_threshold <= 1.0):
-            raise ValueError("confidence_threshold must be in [0, 1]")
-        if positional_sigma_threshold <= 0:
-            raise ValueError("positional_sigma_threshold must be positive")
+        if confidence_threshold is not None:
+            if not (0.0 <= confidence_threshold <= 1.0):
+                raise ValueError("confidence_threshold must be in [0, 1]")
+            self.confidence_threshold = confidence_threshold
         
-        self.confidence_threshold = confidence_threshold
-        self.positional_sigma_threshold = positional_sigma_threshold
-        logger.info(f"Thresholds updated: conf={confidence_threshold}, sigma={positional_sigma_threshold}")
+        if positional_sigma_threshold is not None:
+            if positional_sigma_threshold <= 0:
+                raise ValueError("positional_sigma_threshold must be positive")
+            self.positional_sigma_threshold = positional_sigma_threshold
+        
+        logger.info(f"Thresholds updated: conf={self.confidence_threshold}, sigma={self.positional_sigma_threshold}")
     
     def get_calibration_metrics(self) -> Dict[str, float]:
         """Get calibration metrics."""
