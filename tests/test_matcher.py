@@ -94,8 +94,8 @@ class TestBayesianMatcher:
         
         # Should find one match (to closer source)
         assert len(matches) > 0
-        assert matches[0].source_ref == "src-1"
-        assert matches[0].source_match == "src-2"
+        assert matches[0].source1_id == "src-1"
+        assert matches[0].source2_id == "src-2"
     
     def test_calibration_metrics(self, sample_sources):
         """Test calibration metrics."""
@@ -150,20 +150,18 @@ class TestMatcherCalibration:
         # Create matches
         matches = [
             MatchResult(
-                source_ref="ref1",
-                source_match="cand1",
+                source1_id="ref1",
+                source2_id="cand1",
                 match_probability=0.9,
-                position_significance=1.5,
-                photometric_consistency=0.8,
-                match_type="combined"
+                separation_arcsec=5.4,
+                confidence=0.9
             ),
             MatchResult(
-                source_ref="ref2",
-                source_match="cand2",
+                source1_id="ref2",
+                source2_id="cand2",
                 match_probability=0.7,
-                position_significance=2.0,
-                photometric_consistency=0.6,
-                match_type="positional"
+                separation_arcsec=7.2,
+                confidence=0.7
             )
         ]
         

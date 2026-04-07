@@ -93,14 +93,23 @@ class BayesianMatcher(Matcher):
                 match_type = "combined" if photo_cons > 0.5 and pos_sig < self.positional_sigma_threshold else \
                              "photometric" if photo_cons > 0.5 else "positional"
                 
+                # Calculate angular separation in arcseconds
+                distance_deg = self._angular_distance(
+                    ref_source.coordinate.ra, ref_source.coordinate.dec,
+                    best_match.coordinate.ra, best_match.coordinate.dec
+                )
+                separation_arcsec = distance_deg * 3600.0
+                
+                # Convert confidence string to float
+                confidence_map = {"high": 0.9, "medium": 0.7, "low": 0.5}
+                confidence_score = confidence_map.get(confidence, 0.5)
+                
                 match_result = MatchResult(
-                    source_ref=ref_source.id,
-                    source_match=best_match.id,
+                    source1_id=ref_source.id,
+                    source2_id=best_match.id,
                     match_probability=best_prob,
-                    position_significance=pos_sig,
-                    photometric_consistency=photo_cons,
-                    match_type=match_type,
-                    confidence=confidence
+                    separation_arcsec=separation_arcsec,
+                    confidence=confidence_score
                 )
                 matches.append(match_result)
                 logger.debug(f"Match found: {ref_source.name} -> {best_match.name} ({best_prob:.2f})")
