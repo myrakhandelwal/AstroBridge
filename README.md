@@ -141,11 +141,13 @@ This persistence is used by:
 
 For detailed information:
 
-1. **[docs/COMMAND_GUIDE.md](docs/COMMAND_GUIDE.md)** — Complete user guide with CLI commands, REST API endpoints, Python API examples, and expected output samples.
+1. **[docs/Command Guide.md](docs/Command%20Guide.md)** — Complete user guide with CLI commands, REST API endpoints, Python API examples, and expected output samples.
 
-2. **[docs/ALGORITHM_AND_SCIENCE.md](docs/ALGORITHM_AND_SCIENCE.md)** — Deep dive into the Bayesian matching algorithm, mathematical foundations, photometric and astrometric likelihoods, proper-motion corrections, and practical examples with real data.
+2. **[docs/Algorithm and Science.md](docs/Algorithm%20and%20Science.md)** — Deep dive into the Bayesian matching algorithm, mathematical foundations, photometric and astrometric likelihoods, proper-motion corrections, and practical examples with real data.
 
-3. **[docs/ARCHITECTURE_GUIDE.md](docs/ARCHITECTURE_GUIDE.md)** — System architecture, component design, advanced usage patterns, custom catalog adapters, batch processing, reproducible workflows, and teaching applications for research and education.
+3. **[docs/Architecture Guide.md](docs/Architecture%20Guide.md)** — System architecture, component design, advanced usage patterns, custom catalog adapters, batch processing, reproducible workflows, and teaching applications for research and education.
+
+4. **[docs/Deployment Guide.md](docs/Deployment%20Guide.md)** — Production deployment strategies (Docker, AWS, Kubernetes), PyPI releases, database setup, monitoring, security hardening, and disaster recovery planning.
 
 ## Package API Reference (Current)
 
