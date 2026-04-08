@@ -12,6 +12,7 @@ setup(
     name="astrobridge",
     version="0.1.1",
     description="Astronomical source matching and cross-catalog orchestration",
+    license="MIT",
     long_description=long_description,
     long_description_content_type="text/markdown",
     python_requires=">=3.9",
@@ -43,5 +44,8 @@ setup(
             "astrobridge-web=astrobridge.web.app:main",
         ]
     },
+    classifiers=[
+        "License :: OSI Approved :: MIT License",
+    ],
     include_package_data=True,
 )

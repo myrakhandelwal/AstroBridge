@@ -94,10 +94,6 @@ Commands currently developed in AstroBridge:
 11. `pip install -e .[web]`
 	 Installs optional web console dependencies.
 
-## Manuscript Draft
-
-LaTeX manuscript draft for the AI/astronomy paper is available at [docs/astrobridge_ai_astronomy_paper.tex](docs/astrobridge_ai_astronomy_paper.tex).
-
 ## Advanced API Endpoints
 
 The following production-foundation endpoints are now available in the FastAPI app:
@@ -222,6 +218,10 @@ It uses synthetic data so it can run without external catalog access.
 ## Development Notes
 
 The test suite uses `pytest-asyncio`, which is included in the `dev` extra.
+
+## License
+
+AstroBridge is licensed under the MIT License. See [LICENSE](LICENSE).
 
 Simbad and NED currently use deterministic local datasets for fast, reliable development and CI validation.
 
