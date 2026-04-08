@@ -10,7 +10,7 @@ long_description = README.read_text(encoding="utf-8") if README.exists() else ""
 
 setup(
     name="astrobridge",
-    version="0.1.1",
+    version="0.2.0",
     description="Astronomical source matching and cross-catalog orchestration",
     license="MIT",
     long_description=long_description,
