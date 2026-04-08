@@ -149,6 +149,12 @@ For detailed information:
 
 4. **[docs/Deployment Guide.md](docs/Deployment%20Guide.md)** — Production deployment strategies (Docker, AWS, Kubernetes), PyPI releases, database setup, monitoring, security hardening, and disaster recovery planning.
 
+5. **[docs/AstroBridge_Research_Paper_Full.tex](docs/AstroBridge_Research_Paper_Full.tex)** — Full research manuscript aligned with the implemented pipeline, including validated benchmark and test metrics.
+
+6. **[docs/AstroBridge_Research_Paper_Conference.tex](docs/AstroBridge_Research_Paper_Conference.tex)** — Short conference-format paper version (4-6 pages) for submissions.
+
+7. **[docs/Platforms_and_Catalogs_Matrix.md](docs/Platforms_and_Catalogs_Matrix.md)** — Catalog and platform matrix showing object coverage and recommended usage.
+
 ## Package API Reference (Current)
 
 Key public classes/functions currently implemented:
