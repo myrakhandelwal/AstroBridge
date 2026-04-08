@@ -162,8 +162,10 @@ class AstroBridgeOrchestrator:
         sources = []
         
         try:
-            if request.query_type == "name" and request.name:
-                result = connector.query(request.name)
+            lookup_value = request.name or request.description or ""
+
+            if request.query_type in {"name", "natural_language"} and lookup_value:
+                result = connector.query(lookup_value)
                 if result:
                     sources.append(self._source_to_response(result, catalog))
             

@@ -1,6 +1,6 @@
 """Data schemas for API requests and responses."""
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 
@@ -34,16 +34,8 @@ class QueryRequest(BaseModel):
 
 class SourceResponse(BaseModel):
     """Response with source information."""
-    id: str = Field(..., description="Source ID")
-    name: str = Field(..., description="Source name")
-    ra: float = Field(..., description="Right ascension in degrees")
-    dec: float = Field(..., description="Declination in degrees")
-    catalog: str = Field(..., description="Catalog source")
-    object_type: Optional[str] = Field(None, description="Object type")
-    magnitude: Optional[float] = Field(None, description="Magnitude")
-    
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "id": "SIMBAD:*2MASS J12345+67890",
                 "name": "Proxima Centauri",
@@ -51,9 +43,18 @@ class SourceResponse(BaseModel):
                 "dec": -62.680,
                 "catalog": "simbad",
                 "object_type": "star",
-                "magnitude": 11.05
+                "magnitude": 11.05,
             }
         }
+    )
+
+    id: str = Field(..., description="Source ID")
+    name: str = Field(..., description="Source name")
+    ra: float = Field(..., description="Right ascension in degrees")
+    dec: float = Field(..., description="Declination in degrees")
+    catalog: str = Field(..., description="Catalog source")
+    object_type: Optional[str] = Field(None, description="Object type")
+    magnitude: Optional[float] = Field(None, description="Magnitude")
 
 
 class MatchResponse(BaseModel):
@@ -67,6 +68,22 @@ class MatchResponse(BaseModel):
 
 class QueryResponse(BaseModel):
     """Complete response to a query request."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "query_id": "q_550e8400e29b41d4a716446655440000",
+                "timestamp": "2026-04-07T14:30:00Z",
+                "status": "success",
+                "query_type": "name",
+                "catalogs_queried": ["simbad", "ned"],
+                "sources": [],
+                "matches": [],
+                "execution_time_ms": 245.5,
+                "errors": [],
+            }
+        }
+    )
+
     query_id: str = Field(..., description="Unique query identifier")
     timestamp: datetime = Field(..., description="Query timestamp")
     status: str = Field(
@@ -80,7 +97,7 @@ class QueryResponse(BaseModel):
         description="Sources found across all catalogs"
     )
     matches: List[MatchResponse] = Field(
-        default=[],
+        default_factory=list,
         description="Cross-catalog matches found"
     )
     routing_reasoning: Optional[str] = Field(
@@ -88,19 +105,4 @@ class QueryResponse(BaseModel):
         description="Explanation of catalog routing decision"
     )
     execution_time_ms: float = Field(..., description="Query execution time in milliseconds")
-    errors: List[str] = Field(default=[], description="Any errors encountered")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "query_id": "q_550e8400e29b41d4a716446655440000",
-                "timestamp": "2026-04-07T14:30:00Z",
-                "status": "success",
-                "query_type": "name",
-                "catalogs_queried": ["simbad", "ned"],
-                "sources": [],
-                "matches": [],
-                "execution_time_ms": 245.5,
-                "errors": []
-            }
-        }
+    errors: List[str] = Field(default_factory=list, description="Any errors encountered")

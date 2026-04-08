@@ -1,0 +1,17 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+
+# Packaging outputs
+*.egg-info/
+build/
+dist/
+
+# OS/editor files
+.DS_Store
+.vscode/
