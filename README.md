@@ -137,6 +137,14 @@ This persistence is used by:
 1. `POST /api/jobs` and related job result/status endpoints.
 2. `POST /api/analytics/event` and `GET /api/analytics/summary`.
 
+## Documentation
+
+For detailed information:
+
+1. **[docs/COMMAND_GUIDE.md](docs/COMMAND_GUIDE.md)** — Complete user guide with CLI commands, REST API endpoints, Python API examples, and expected output samples.
+
+2. **[docs/ALGORITHM_AND_SCIENCE.md](docs/ALGORITHM_AND_SCIENCE.md)** — Deep dive into the Bayesian matching algorithm, mathematical foundations, photometric and astrometric likelihoods, proper-motion corrections, and practical examples with real data.
+
 ## Package API Reference (Current)
 
 Key public classes/functions currently implemented:
