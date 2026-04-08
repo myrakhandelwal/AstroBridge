@@ -12,7 +12,7 @@ Recent additions include confidence scoring for every match and optional proper-
 
 ## Quick Start
 
-Create a virtual environment, install the package, then run the demo or tests.
+Create a virtual environment, install the package, then run CLI-first workflows.
 
 ```bash
 python -m venv .venv
@@ -38,15 +38,6 @@ Run the test suite:
 pytest
 ```
 
-Run the web frontend:
-
-```bash
-pip install -e .[web]
-astrobridge-web
-```
-
-Then open `http://127.0.0.1:8000` in your browser.
-
 Run the object-identification command:
 
 ```bash
@@ -54,6 +45,54 @@ astrobridge-identify "Find nearby red dwarf stars"
 ```
 
 This prints the inferred object class, a short description of what it is, the suggested search radius, and the best starting catalogs.
+
+## Optional Web UI
+
+The web console is an optional side interface for interactive use. The primary workflow remains CLI and importable Python modules.
+
+```bash
+pip install -e .[web]
+./.venv/bin/astrobridge-web
+```
+
+Then open `http://127.0.0.1:8000` in your browser.
+
+## Command Reference
+
+Commands currently developed in AstroBridge:
+
+1. `astrobridge-demo`
+	Runs the end-to-end demonstration of models, routing, matching, and orchestration.
+
+2. `python demo.py`
+	Alternate way to run the same demo script directly.
+
+3. `astrobridge-identify "<input>"`
+	Classifies the object/query text and returns a plain-language description, recommended search radius, and top catalogs.
+
+4. `python -m astrobridge.identify "<input>"`
+	Module-invocation fallback for identification (useful if console scripts are not on PATH).
+
+5. `astrobridge-web`
+	Starts the FastAPI web console on `127.0.0.1:8000` (optional UI path).
+
+6. `python -m astrobridge.web.app`
+	Module-invocation fallback to start the same web server.
+
+7. `pytest`
+	Runs the full test suite.
+
+8. `pytest tests/test_identify.py tests/test_web.py -q`
+	Fast validation for identification and web error-handling paths.
+
+9. `pip install -e .[dev]`
+	Installs AstroBridge in editable mode with development dependencies.
+
+10. `pip install -e .[live]`
+	 Installs optional live TAP adapter dependencies.
+
+11. `pip install -e .[web]`
+	 Installs optional web console dependencies.
 
 ## What You Get
 
