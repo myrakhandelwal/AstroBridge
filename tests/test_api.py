@@ -64,6 +64,38 @@ class TestQuerySchemas:
         )
         assert req.query_type == "natural_language"
         assert "red dwarf" in req.description
+
+    def test_query_request_matcher_controls(self):
+        """Test QueryRequest matcher control fields."""
+        req = QueryRequest(
+            query_type="name",
+            name="Barnard's Star",
+            proper_motion_aware=True,
+            match_epoch=datetime(2020, 1, 1),
+            astrometric_weight=0.8,
+            photometric_weight=0.2,
+        )
+
+        assert req.proper_motion_aware is True
+        assert req.match_epoch == datetime(2020, 1, 1)
+        assert req.astrometric_weight == 0.8
+        assert req.photometric_weight == 0.2
+
+    def test_query_request_weight_validation(self):
+        """Test QueryRequest weight validation bounds."""
+        with pytest.raises(ValueError):
+            QueryRequest(query_type="name", name="x", astrometric_weight=1.5)
+        with pytest.raises(ValueError):
+            QueryRequest(query_type="name", name="x", photometric_weight=-0.1)
+
+    def test_query_request_weighting_profile(self):
+        """Test QueryRequest weighting profile field."""
+        req = QueryRequest(
+            query_type="name",
+            name="Test",
+            weighting_profile="position_first",
+        )
+        assert req.weighting_profile == "position_first"
     
     def test_source_response(self):
         """Test SourceResponse schema."""
@@ -245,6 +277,46 @@ class TestQueryExecution:
         # Should complete without crashing
         assert response.query_id is not None
         assert response.execution_time_ms > 0
+
+    async def test_execute_query_applies_matcher_options(self):
+        """Test orchestrator applies matcher controls from request."""
+        matcher = BayesianMatcher()
+        orchestrator = AstroBridgeOrchestrator(matcher=matcher)
+
+        request = QueryRequest(
+            query_type="name",
+            name="Test Object",
+            auto_route=False,
+            proper_motion_aware=True,
+            match_epoch=datetime(2015, 6, 1),
+            astrometric_weight=0.9,
+            photometric_weight=0.1,
+        )
+
+        await orchestrator.execute_query(request)
+
+        assert matcher.proper_motion_aware is True
+        assert matcher.match_epoch == datetime(2015, 6, 1)
+        assert matcher.confidence_scorer.astrometric_weight == pytest.approx(0.9)
+        assert matcher.confidence_scorer.photometric_weight == pytest.approx(0.1)
+
+    async def test_execute_query_applies_weighting_profile(self):
+        """Test orchestrator applies named weighting profile to scorer."""
+        matcher = BayesianMatcher()
+        orchestrator = AstroBridgeOrchestrator(matcher=matcher)
+
+        request = QueryRequest(
+            query_type="name",
+            name="Any",
+            auto_route=False,
+            weighting_profile="photometry_first",
+        )
+
+        await orchestrator.execute_query(request)
+
+        assert matcher.confidence_scorer.weighting_profile == "photometry_first"
+        assert matcher.confidence_scorer.astrometric_weight == pytest.approx(0.4)
+        assert matcher.confidence_scorer.photometric_weight == pytest.approx(0.6)
 
 
 class TestSourceConversion:

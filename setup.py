@@ -26,11 +26,20 @@ setup(
         "dev": [
             "pytest>=8.0",
             "pytest-asyncio>=0.23",
-        ]
+        ],
+        "live": [
+            "pyvo>=1.5",
+        ],
+        "web": [
+            "fastapi>=0.111",
+            "uvicorn>=0.30",
+            "httpx>=0.27",
+        ],
     },
     entry_points={
         "console_scripts": [
             "astrobridge-demo=demo:main",
+            "astrobridge-web=astrobridge.web.app:main",
         ]
     },
     include_package_data=True,

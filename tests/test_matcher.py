@@ -3,6 +3,7 @@ import pytest
 import numpy as np
 from datetime import datetime
 from astrobridge.matching import BayesianMatcher, MatcherConfig, ObjectType
+from astrobridge.matching.confidence import MatchScore
 from astrobridge.models import (
     Source, Coordinate, Uncertainty, Photometry, Provenance
 )
@@ -105,6 +106,113 @@ class TestBayesianMatcher:
         assert metrics["accuracy"] == 0.95
         assert metrics["precision"] == 0.92
         assert metrics["recall"] == 0.88
+
+    def test_match_uses_confidence_scorer(self, sample_sources):
+        """Test that matcher confidence is produced by confidence scorer."""
+
+        class FixedScorer:
+            def compute_score(self, source1, source2, separation_arcsec, runner_up_separation_arcsec=None):
+                return MatchScore(confidence=0.42, explanation="fixed scorer")
+
+        matcher = BayesianMatcher(confidence_scorer=FixedScorer())
+        matches = matcher.match([sample_sources[0]], [sample_sources[1], sample_sources[2]])
+
+        assert len(matches) > 0
+        assert matches[0].confidence == 0.42
+
+    def test_match_confidence_range_and_signal(self, sample_sources):
+        """Test confidence stays in bounds and nearby match yields meaningful confidence."""
+        matcher = BayesianMatcher()
+        matches = matcher.match([sample_sources[0]], [sample_sources[1], sample_sources[2]])
+
+        assert len(matches) > 0
+        assert 0.0 <= matches[0].confidence <= 1.0
+        assert matches[0].confidence > 0.5
+
+    def test_proper_motion_aware_recovers_epoch_shifted_match(self):
+        """Proper-motion-aware mode should recover matches separated by epoch drift."""
+        epoch_2000 = datetime(2000, 1, 1)
+        epoch_2020 = datetime(2020, 1, 1)
+
+        ref = Source(
+            id="pm-ref",
+            name="PMRef",
+            coordinate=Coordinate(ra=120.0, dec=10.0, pm_ra_mas_per_year=4000.0, pm_dec_mas_per_year=0.0),
+            uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
+            photometry=[Photometry(magnitude=12.0, band="V")],
+            provenance=Provenance(
+                catalog_name="CAT-A",
+                catalog_version="1",
+                query_timestamp=epoch_2000,
+                source_id="A1",
+            ),
+        )
+
+        # 20 years * 4000 mas/year = 80 arcsec drift in RA at observation epoch.
+        cand = Source(
+            id="pm-cand",
+            name="PMCand",
+            coordinate=Coordinate(ra=120.0 + (80.0 / 3600.0), dec=10.0, pm_ra_mas_per_year=4000.0, pm_dec_mas_per_year=0.0),
+            uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
+            photometry=[Photometry(magnitude=12.0, band="V")],
+            provenance=Provenance(
+                catalog_name="CAT-B",
+                catalog_version="1",
+                query_timestamp=epoch_2020,
+                source_id="B1",
+            ),
+        )
+
+        plain_matcher = BayesianMatcher(proper_motion_aware=False)
+        pm_matcher = BayesianMatcher(proper_motion_aware=True)
+
+        plain_matches = plain_matcher.match([ref], [cand])
+        pm_matches = pm_matcher.match([ref], [cand])
+
+        assert len(plain_matches) == 0
+        assert len(pm_matches) == 1
+        assert pm_matches[0].source2_id == "pm-cand"
+        assert pm_matches[0].separation_arcsec < 1.0
+
+    def test_proper_motion_projection_affects_probability(self):
+        """Epoch-aware probability should exceed raw probability for drifting objects."""
+        epoch_2000 = datetime(2000, 1, 1)
+        epoch_2020 = datetime(2020, 1, 1)
+
+        ref = Source(
+            id="pm2-ref",
+            name="PM2Ref",
+            coordinate=Coordinate(ra=200.0, dec=-5.0, pm_ra_mas_per_year=3000.0, pm_dec_mas_per_year=0.0),
+            uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
+            photometry=[Photometry(magnitude=14.0, band="V")],
+            provenance=Provenance(
+                catalog_name="CAT-A",
+                catalog_version="1",
+                query_timestamp=epoch_2000,
+                source_id="A2",
+            ),
+        )
+
+        cand = Source(
+            id="pm2-cand",
+            name="PM2Cand",
+            coordinate=Coordinate(ra=200.0 + (60.0 / 3600.0), dec=-5.0, pm_ra_mas_per_year=3000.0, pm_dec_mas_per_year=0.0),
+            uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
+            photometry=[Photometry(magnitude=14.0, band="V")],
+            provenance=Provenance(
+                catalog_name="CAT-B",
+                catalog_version="1",
+                query_timestamp=epoch_2020,
+                source_id="B2",
+            ),
+        )
+
+        matcher = BayesianMatcher(proper_motion_aware=True)
+
+        prob_raw = matcher.calculate_match_probability(ref, cand)
+        prob_epoch_aware = matcher.calculate_match_probability(ref, cand, target_epoch=epoch_2000)
+
+        assert prob_epoch_aware > prob_raw
 
 
 class TestMatcherConfig:

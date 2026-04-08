@@ -4,7 +4,7 @@
 
 AstroBridge is an intelligent astronomical source matching system that leverages Bayesian inference, natural language processing, and multi-catalog orchestration to seamlessly cross-reference astronomical sources across diverse catalogs.
 
-**Status**: Phases 1-6 Complete | 71 Tests Passing (100%) | Production-Ready Architecture
+**Status**: Phases 1-6 Complete with 2026 hardening + web console updates | 106 Tests Passing (100%) | Production-Ready Architecture
 
 ---
 
@@ -70,7 +70,14 @@ AstroBridge is an intelligent astronomical source matching system that leverages
   - Bayesian P(match|data) = P(data|match) × P(match) / P(data)
   - Positional likelihood using astrometric covariance
   - Photometric consistency across common bands
+  - Confidence scoring integration for each emitted match
+  - Optional proper-motion-aware epoch projection during matching
   - Deterministic, reproducible output
+
+- `ConfidenceScorer`:
+  - Composite confidence score using astrometric and photometric evidence
+  - Ambiguity-aware bonus using runner-up separation
+  - Human-readable explanation generation for score rationale
 
 - `SpatialIndex` (95 lines):
   - Grid-based O(1) nearest-neighbor candidate generation
@@ -92,8 +99,8 @@ AstroBridge is an intelligent astronomical source matching system that leverages
 **Tests**: 
 - 6 unit tests (matcher, config, calibration)
 - 3 regression tests (determinism, bounds, ordering)
-- 4 integration tests (pipeline, error handling)
-- **Total**: 17 passing (89.5% pass rate), 2 skipped for incomplete APIs
+- 5 integration tests (pipeline, error handling, proper-motion epoch behavior)
+- Confidence scorer unit tests and matcher integration tests added
 
 ---
 
@@ -181,7 +188,7 @@ Phase 4: Matching     - 17 tests (89.5% pass rate)
 Phase 5: Routing      - 33 tests (100% pass rate)
 Phase 6: API          - 21 tests (100% pass rate)
 
-TOTAL: 71 tests passing, 2 skipped
+TOTAL: 106 tests passing, 0 skipped
 Success Rate: 100% pass rate on active tests
 ```
 
@@ -233,10 +240,10 @@ c382131 Phase 4: Fix probabilistic matcher field names
 
 Planned enhancements for production deployment:
 
-1. **REST API Layer** (FastAPI/Flask)
-   - POST `/query` with QueryRequest
-   - GET `/query/{query_id}` for async results
-   - WebSocket support for streaming results
+1. **Web/API Productization**
+   - Extend current FastAPI web console with authentication and persisted query history
+   - Add async job endpoints for long-running cross-match workloads
+   - Add operator-grade observability (request tracing, adapter telemetry, per-catalog latency dashboards)
 
 2. **Performance Optimization**
    - Caching strategies for repeated queries

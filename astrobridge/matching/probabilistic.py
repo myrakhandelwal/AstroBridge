@@ -1,10 +1,12 @@
 """Probabilistic cross-matching implementation."""
 import logging
 import numpy as np
+from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from astrobridge.models import Source, MatchResult
 from astrobridge.matching.base import Matcher, MatcherError
 from astrobridge.matching.spatial import SpatialIndex
+from astrobridge.matching.confidence import ConfidenceScorer
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +18,10 @@ class BayesianMatcher(Matcher):
         self,
         positional_sigma_threshold: float = 3.0,
         confidence_threshold: float = 0.05,  # Lowered to 0.05 for realistic matching
-        prior_match_prob: float = 0.7  # Increased from 0.1 for more permissive matching
+        prior_match_prob: float = 0.7,  # Increased from 0.1 for more permissive matching
+        confidence_scorer: Optional[ConfidenceScorer] = None,
+        proper_motion_aware: bool = False,
+        match_epoch: Optional[datetime] = None,
     ):
         """
         Initialize Bayesian matcher.
@@ -29,6 +34,9 @@ class BayesianMatcher(Matcher):
         self.positional_sigma_threshold = positional_sigma_threshold
         self.confidence_threshold = confidence_threshold
         self.prior_match_prob = prior_match_prob
+        self.confidence_scorer = confidence_scorer or ConfidenceScorer()
+        self.proper_motion_aware = proper_motion_aware
+        self.match_epoch = match_epoch
         
         self.calibration_metrics = {"accuracy": 0.0, "precision": 0.0, "recall": 0.0}
     
@@ -53,19 +61,33 @@ class BayesianMatcher(Matcher):
             logger.warning("No candidate sources provided")
             return []
         
-        # Build spatial index on candidates
-        spatial_index = SpatialIndex(candidate_sources)
+        # Build spatial index on candidates for non-proper-motion matching.
+        spatial_index = None
+        if not self.proper_motion_aware:
+            spatial_index = SpatialIndex(candidate_sources)
         
         matches = []
         search_radius_arcsec = 60.0  # Default search radius (sufficient for typical astrometric errors)
         
         for ref_source in ref_sources:
+            # Match at reference source epoch unless an explicit match epoch is provided.
+            reference_epoch = self.match_epoch or ref_source.provenance.query_timestamp
+
             # Find nearby candidates
-            nearby_indices = spatial_index.query_radius(
-                ref_source.coordinate.ra,
-                ref_source.coordinate.dec,
-                search_radius_arcsec
-            )
+            if self.proper_motion_aware:
+                ref_ra, ref_dec = self._coordinate_at_epoch(ref_source, reference_epoch)
+                nearby_indices = []
+                for idx, candidate in enumerate(candidate_sources):
+                    cand_ra, cand_dec = self._coordinate_at_epoch(candidate, reference_epoch)
+                    sep_arcsec = self._angular_distance(ref_ra, ref_dec, cand_ra, cand_dec) * 3600.0
+                    if sep_arcsec <= search_radius_arcsec:
+                        nearby_indices.append(idx)
+            else:
+                nearby_indices = spatial_index.query_radius(
+                    ref_source.coordinate.ra,
+                    ref_source.coordinate.dec,
+                    search_radius_arcsec
+                )
             
             if not nearby_indices:
                 logger.debug(f"No candidates near {ref_source.name}")
@@ -78,45 +100,79 @@ class BayesianMatcher(Matcher):
             for cand_idx in nearby_indices:
                 candidate = candidate_sources[cand_idx]
                 
-                prob = self.calculate_match_probability(ref_source, candidate)
+                prob = self.calculate_match_probability(
+                    ref_source,
+                    candidate,
+                    target_epoch=reference_epoch if self.proper_motion_aware else None,
+                )
                 
                 if prob > best_prob:
                     best_prob = prob
                     best_match = candidate
             
             if best_match is not None:
-                # Compute detailed scores
-                pos_sig = self._positional_significance(ref_source, best_match)
-                photo_cons = self._photometric_consistency(ref_source, best_match)
-                
-                confidence = "high" if best_prob > 0.8 else "medium" if best_prob > 0.6 else "low"
-                match_type = "combined" if photo_cons > 0.5 and pos_sig < self.positional_sigma_threshold else \
-                             "photometric" if photo_cons > 0.5 else "positional"
-                
                 # Calculate angular separation in arcseconds
+                if self.proper_motion_aware:
+                    ref_ra, ref_dec = self._coordinate_at_epoch(ref_source, reference_epoch)
+                    best_ra, best_dec = self._coordinate_at_epoch(best_match, reference_epoch)
+                else:
+                    ref_ra, ref_dec = ref_source.coordinate.ra, ref_source.coordinate.dec
+                    best_ra, best_dec = best_match.coordinate.ra, best_match.coordinate.dec
+
                 distance_deg = self._angular_distance(
-                    ref_source.coordinate.ra, ref_source.coordinate.dec,
-                    best_match.coordinate.ra, best_match.coordinate.dec
+                    ref_ra,
+                    ref_dec,
+                    best_ra,
+                    best_dec,
                 )
                 separation_arcsec = distance_deg * 3600.0
-                
-                # Convert confidence string to float
-                confidence_map = {"high": 0.9, "medium": 0.7, "low": 0.5}
-                confidence_score = confidence_map.get(confidence, 0.5)
+
+                # Find next-best separation to inform ambiguity handling.
+                runner_up_separation_arcsec = None
+                runner_up_distances = []
+                for cand_idx in nearby_indices:
+                    candidate = candidate_sources[cand_idx]
+                    if candidate.id == best_match.id:
+                        continue
+                    if self.proper_motion_aware:
+                        cand_ra, cand_dec = self._coordinate_at_epoch(candidate, reference_epoch)
+                    else:
+                        cand_ra, cand_dec = candidate.coordinate.ra, candidate.coordinate.dec
+                    cand_distance_deg = self._angular_distance(
+                        ref_ra,
+                        ref_dec,
+                        cand_ra,
+                        cand_dec,
+                    )
+                    runner_up_distances.append(cand_distance_deg * 3600.0)
+                if runner_up_distances:
+                    runner_up_separation_arcsec = min(runner_up_distances)
+
+                confidence_result = self.confidence_scorer.compute_score(
+                    ref_source,
+                    best_match,
+                    separation_arcsec=separation_arcsec,
+                    runner_up_separation_arcsec=runner_up_separation_arcsec,
+                )
                 
                 match_result = MatchResult(
                     source1_id=ref_source.id,
                     source2_id=best_match.id,
                     match_probability=best_prob,
                     separation_arcsec=separation_arcsec,
-                    confidence=confidence_score
+                    confidence=confidence_result.confidence,
                 )
                 matches.append(match_result)
                 logger.debug(f"Match found: {ref_source.name} -> {best_match.name} ({best_prob:.2f})")
         
         return matches
     
-    def calculate_match_probability(self, source_ref: Source, source_candidate: Source) -> float:
+    def calculate_match_probability(
+        self,
+        source_ref: Source,
+        source_candidate: Source,
+        target_epoch: Optional[datetime] = None,
+    ) -> float:
         """
         Calculate posterior probability that sources are the same object.
         
@@ -131,7 +187,11 @@ class BayesianMatcher(Matcher):
             Match probability (0-1)
         """
         # Position likelihood
-        pos_likelihood = self._positional_likelihood(source_ref, source_candidate)
+        pos_likelihood = self._positional_likelihood(
+            source_ref,
+            source_candidate,
+            target_epoch=target_epoch,
+        )
         
         # Photometry likelihood
         photo_likelihood = self._photometric_likelihood(source_ref, source_candidate)
@@ -174,11 +234,25 @@ class BayesianMatcher(Matcher):
         """Set calibration metrics from test set."""
         self.calibration_metrics = {"accuracy": accuracy, "precision": precision, "recall": recall}
     
-    def _positional_likelihood(self, source_ref: Source, source_cand: Source) -> float:
+    def _positional_likelihood(
+        self,
+        source_ref: Source,
+        source_cand: Source,
+        target_epoch: Optional[datetime] = None,
+    ) -> float:
         """Compute positional likelihood."""
+        if target_epoch is not None:
+            ref_ra, ref_dec = self._coordinate_at_epoch(source_ref, target_epoch)
+            cand_ra, cand_dec = self._coordinate_at_epoch(source_cand, target_epoch)
+        else:
+            ref_ra, ref_dec = source_ref.coordinate.ra, source_ref.coordinate.dec
+            cand_ra, cand_dec = source_cand.coordinate.ra, source_cand.coordinate.dec
+
         distance_deg = self._angular_distance(
-            source_ref.coordinate.ra, source_ref.coordinate.dec,
-            source_cand.coordinate.ra, source_cand.coordinate.dec
+            ref_ra,
+            ref_dec,
+            cand_ra,
+            cand_dec,
         )
         
         # Use total uncertainty (combined from both sources)
@@ -276,3 +350,22 @@ class BayesianMatcher(Matcher):
     def _angular_distance(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
         """Compute angular distance in degrees (simple Euclidean, not Haversine)."""
         return np.sqrt((ra1 - ra2)**2 + (dec1 - dec2)**2)
+
+    @staticmethod
+    def _coordinate_at_epoch(source: Source, target_epoch: datetime) -> Tuple[float, float]:
+        """Project source coordinates to a target epoch using linear proper motion."""
+        ra = source.coordinate.ra
+        dec = source.coordinate.dec
+
+        source_epoch = source.provenance.query_timestamp
+        delta_years = (target_epoch - source_epoch).total_seconds() / (365.25 * 24.0 * 3600.0)
+
+        pm_ra = source.coordinate.pm_ra_mas_per_year or 0.0
+        pm_dec = source.coordinate.pm_dec_mas_per_year or 0.0
+
+        ra += (pm_ra * delta_years) / (1000.0 * 3600.0)
+        dec += (pm_dec * delta_years) / (1000.0 * 3600.0)
+
+        ra = ra % 360.0
+        dec = max(-90.0, min(90.0, dec))
+        return ra, dec

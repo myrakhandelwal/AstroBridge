@@ -6,6 +6,7 @@ import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from .schemas import QueryRequest, QueryResponse, SourceResponse, MatchResponse
+from astrobridge.matching.confidence import ConfidenceScorer
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,8 @@ class AstroBridgeOrchestrator:
         logger.info(f"Query {query_id}: Starting {request.query_type} query")
         
         try:
+            self._apply_matcher_controls(request)
+
             # Determine catalogs to query
             if request.auto_route and self.router:
                 routing_decision = self.router.parse_query(
@@ -136,6 +139,59 @@ class AstroBridgeOrchestrator:
                 matches=[],
                 execution_time_ms=execution_time_ms,
                 errors=[str(e)]
+            )
+
+    def _apply_matcher_controls(self, request: QueryRequest) -> None:
+        """Apply optional matcher controls from API request."""
+        if self.matcher is None:
+            return
+
+        if hasattr(self.matcher, "proper_motion_aware"):
+            self.matcher.proper_motion_aware = bool(request.proper_motion_aware)
+
+        if hasattr(self.matcher, "match_epoch"):
+            self.matcher.match_epoch = request.match_epoch
+
+        if (
+            request.astrometric_weight is None
+            and request.photometric_weight is None
+            and request.weighting_profile is None
+        ):
+            return
+
+        existing = getattr(self.matcher, "confidence_scorer", None)
+        if existing is None:
+            existing = ConfidenceScorer()
+
+        if request.weighting_profile is not None:
+            profiled = ConfidenceScorer.from_profile(
+                request.weighting_profile,
+                uncertainty_scaling=existing.uncertainty_scaling,
+                max_separation_arcsec=existing.max_separation_arcsec,
+            )
+            astrometric_weight = profiled.astrometric_weight
+            photometric_weight = profiled.photometric_weight
+            weighting_profile = request.weighting_profile
+        else:
+            astrometric_weight = existing.astrometric_weight
+            photometric_weight = existing.photometric_weight
+            weighting_profile = getattr(existing, "weighting_profile", "balanced")
+
+        # Explicit per-request weights override profile values when provided.
+        if request.astrometric_weight is not None:
+            astrometric_weight = request.astrometric_weight
+            weighting_profile = "custom"
+        if request.photometric_weight is not None:
+            photometric_weight = request.photometric_weight
+            weighting_profile = "custom"
+
+        if hasattr(self.matcher, "confidence_scorer"):
+            self.matcher.confidence_scorer = ConfidenceScorer(
+                astrometric_weight=astrometric_weight,
+                photometric_weight=photometric_weight,
+                uncertainty_scaling=existing.uncertainty_scaling,
+                max_separation_arcsec=existing.max_separation_arcsec,
+                weighting_profile=weighting_profile,
             )
     
     async def _query_catalog(

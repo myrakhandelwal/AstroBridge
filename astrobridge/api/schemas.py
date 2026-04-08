@@ -30,6 +30,30 @@ class QueryRequest(BaseModel):
         default=True,
         description="Use intelligent routing to select best catalogs"
     )
+    proper_motion_aware: bool = Field(
+        default=False,
+        description="Enable proper-motion-aware epoch matching in matcher",
+    )
+    match_epoch: Optional[datetime] = Field(
+        None,
+        description="Optional target epoch for matching when proper-motion-aware mode is enabled",
+    )
+    astrometric_weight: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Optional astrometric confidence weighting factor",
+    )
+    photometric_weight: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Optional photometric confidence weighting factor",
+    )
+    weighting_profile: Optional[str] = Field(
+        None,
+        description="Optional weighting profile: balanced, position_first, or photometry_first",
+    )
 
 
 class SourceResponse(BaseModel):

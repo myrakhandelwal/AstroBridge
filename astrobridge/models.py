@@ -8,6 +8,14 @@ class Coordinate(BaseModel):
     """Celestial coordinate."""
     ra: float = Field(..., description="Right ascension in degrees")
     dec: float = Field(..., description="Declination in degrees")
+    pm_ra_mas_per_year: Optional[float] = Field(
+        None,
+        description="Proper motion in RA direction (mas/year)",
+    )
+    pm_dec_mas_per_year: Optional[float] = Field(
+        None,
+        description="Proper motion in Dec direction (mas/year)",
+    )
     
 
 class Uncertainty(BaseModel):

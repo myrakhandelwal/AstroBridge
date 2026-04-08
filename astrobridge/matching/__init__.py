@@ -3,6 +3,7 @@ from .probabilistic import BayesianMatcher
 from .spatial import SpatialIndex
 from .config import MatcherConfig, ObjectType
 from .calibrator import MatcherCalibrator
+from .confidence import ConfidenceScorer, MatchScore
 
 __all__ = [
     "Matcher",
@@ -11,5 +12,7 @@ __all__ = [
     "SpatialIndex",
     "MatcherConfig",
     "ObjectType",
-    "MatcherCalibrator"
+    "MatcherCalibrator",
+    "ConfidenceScorer",
+    "MatchScore",
 ]

@@ -1,5 +1,6 @@
 """Integration tests for full matching pipeline."""
 import pytest
+from datetime import datetime
 from astrobridge.connectors import SimbadConnector, NEDConnector
 from astrobridge.matching import BayesianMatcher, MatcherConfig, ObjectType
 from astrobridge.models import (
@@ -51,6 +52,66 @@ class TestMatchingPipeline:
                 assert match.source1_id in [s.id for s in simbad_results]
                 assert match.source2_id in [s.id for s in ned_results]
                 assert 0.0 <= match.match_probability <= 1.0
+
+    @pytest.mark.asyncio
+    async def test_proper_motion_epoch_aware_cross_match(self):
+        """Test epoch-aware matching for sources with proper motion drift."""
+        epoch_2000 = datetime(2000, 1, 1)
+        epoch_2020 = datetime(2020, 1, 1)
+
+        ref_sources = [
+            Source(
+                id="pm-int-ref",
+                name="PMIntRef",
+                coordinate=Coordinate(
+                    ra=150.0,
+                    dec=30.0,
+                    pm_ra_mas_per_year=3500.0,
+                    pm_dec_mas_per_year=0.0,
+                ),
+                uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
+                photometry=[Photometry(magnitude=13.2, band="V")],
+                provenance=Provenance(
+                    catalog_name="CAT-A",
+                    catalog_version="1.0",
+                    query_timestamp=epoch_2000,
+                    source_id="A-PM-1",
+                ),
+            )
+        ]
+
+        candidate_sources = [
+            Source(
+                id="pm-int-cand",
+                name="PMIntCand",
+                coordinate=Coordinate(
+                    ra=150.0 + (70.0 / 3600.0),
+                    dec=30.0,
+                    pm_ra_mas_per_year=3500.0,
+                    pm_dec_mas_per_year=0.0,
+                ),
+                uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
+                photometry=[Photometry(magnitude=13.2, band="V")],
+                provenance=Provenance(
+                    catalog_name="CAT-B",
+                    catalog_version="1.0",
+                    query_timestamp=epoch_2020,
+                    source_id="B-PM-1",
+                ),
+            )
+        ]
+
+        plain = BayesianMatcher(proper_motion_aware=False)
+        pm_aware = BayesianMatcher(proper_motion_aware=True)
+
+        plain_matches = plain.match(ref_sources, candidate_sources)
+        pm_matches = pm_aware.match(ref_sources, candidate_sources)
+
+        assert len(plain_matches) == 0
+        assert len(pm_matches) == 1
+        assert pm_matches[0].source1_id == "pm-int-ref"
+        assert pm_matches[0].source2_id == "pm-int-cand"
+        assert pm_matches[0].separation_arcsec < 1.0
 
 
 class TestMatcherConfigIntegration:
