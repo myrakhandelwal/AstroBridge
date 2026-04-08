@@ -104,3 +104,8 @@
 - Added a GitHub Actions workflow for tag-triggered PyPI publishing.
 - Workflow builds the package and uploads distributions when a `v*` tag is pushed.
 - Publishing requires a GitHub secret named `PYPI_API_TOKEN`.
+
+### 2026-04-08 AI Object Identification Command
+- Added `astrobridge-identify` as a console script for classifying input text and generating a human-readable object description.
+- The command uses the existing NLP router to infer object class, search radius, and top catalogs.
+- Added focused tests for the new identification helper and CLI formatting output.

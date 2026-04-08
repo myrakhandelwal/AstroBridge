@@ -47,6 +47,14 @@ astrobridge-web
 
 Then open `http://127.0.0.1:8000` in your browser.
 
+Run the object-identification command:
+
+```bash
+astrobridge-identify "Find nearby red dwarf stars"
+```
+
+This prints the inferred object class, a short description of what it is, the suggested search radius, and the best starting catalogs.
+
 ## What You Get
 
 * [astrobridge.models](astrobridge/models.py) for `Source`, `Coordinate`, `Uncertainty`, `Photometry`, and `Provenance`
