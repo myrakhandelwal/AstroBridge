@@ -120,6 +120,55 @@ The following production-foundation endpoints are now available in the FastAPI a
 6. `POST /api/benchmark/run`
 	Execute a reproducible benchmark run and return latency/success metrics.
 
+## Persistent State (Jobs + Analytics)
+
+AstroBridge now persists background job records and analytics events in SQLite.
+
+By default, state is stored at:
+
+```text
+.astrobridge/state.db
+```
+
+Override location with:
+
+```bash
+export ASTROBRIDGE_STATE_DB="/absolute/path/to/state.db"
+```
+
+This persistence is used by:
+
+1. `POST /api/jobs` and related job result/status endpoints.
+2. `POST /api/analytics/event` and `GET /api/analytics/summary`.
+
+## Package API Reference (Current)
+
+Key public classes/functions currently implemented:
+
+1. `astrobridge.api.AstroBridgeOrchestrator`
+	Main orchestration entry for routed catalog querying.
+
+2. `astrobridge.api.QueryRequest`
+	Request model including routing and matcher controls.
+
+3. `astrobridge.matching.BayesianMatcher`
+	Probabilistic matcher with proper-motion-aware options.
+
+4. `astrobridge.matching.ConfidenceScorer`
+	Match confidence computation with weighting profiles.
+
+5. `astrobridge.identify.identify_object`
+	AI-assisted classification and explanatory target description.
+
+6. `astrobridge.analytics.AnalyticsStore`
+	Event store with SQLite-backed telemetry persistence.
+
+7. `astrobridge.jobs.JobManager`
+	Background query job lifecycle manager with persisted state.
+
+8. `astrobridge.benchmarking.BenchmarkRunner`
+	Reproducible latency/success benchmark execution.
+
 ## What You Get
 
 * [astrobridge.models](astrobridge/models.py) for `Source`, `Coordinate`, `Uncertainty`, `Photometry`, and `Provenance`

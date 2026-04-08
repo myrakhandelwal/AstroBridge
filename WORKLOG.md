@@ -114,3 +114,8 @@
 - Added `/api/identify` to the FastAPI web app for live object identification.
 - Added an identification panel to the browser UI with inline success and error output.
 - Added web tests covering valid identification, blank-input rejection, and page rendering.
+
+### 2026-04-08 Persistent Jobs and Analytics
+- Added SQLite persistence for analytics events and asynchronous job records.
+- Added `ASTROBRIDGE_STATE_DB` support to configure state database location.
+- Added persistence tests to verify data survives store/manager re-instantiation.

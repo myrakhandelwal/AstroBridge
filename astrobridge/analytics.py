@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime
+import json
+import os
+from pathlib import Path
+import sqlite3
+import threading
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -23,24 +28,128 @@ class AnalyticsEvent(BaseModel):
 
 
 class AnalyticsStore:
-    """In-memory event store with summary rollups."""
+    """Event store with optional SQLite persistence and summary rollups."""
 
-    def __init__(self) -> None:
+    def __init__(self, db_path: Optional[str] = None, persist: bool = True) -> None:
+        self.persist = persist
         self._events: List[AnalyticsEvent] = []
+        self._lock = threading.Lock()
+
+        if self.persist:
+            default_path = Path(".astrobridge/state.db")
+            resolved = Path(db_path or os.getenv("ASTROBRIDGE_STATE_DB", str(default_path)))
+            resolved.parent.mkdir(parents=True, exist_ok=True)
+            self._db_path = resolved
+            self._init_db()
+        else:
+            self._db_path = None
+
+    def _connect(self) -> sqlite3.Connection:
+        if self._db_path is None:
+            raise RuntimeError("Persistence is disabled")
+        return sqlite3.connect(str(self._db_path), check_same_thread=False)
+
+    def _init_db(self) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS analytics_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    query_type TEXT,
+                    user_level TEXT,
+                    success INTEGER,
+                    latency_ms REAL,
+                    catalog_count INTEGER,
+                    metadata_json TEXT NOT NULL,
+                    timestamp TEXT NOT NULL
+                )
+                """
+            )
+            conn.commit()
+
+    @staticmethod
+    def _event_from_row(row: sqlite3.Row) -> AnalyticsEvent:
+        return AnalyticsEvent(
+            event_type=row["event_type"],
+            query_type=row["query_type"],
+            user_level=row["user_level"],
+            success=(None if row["success"] is None else bool(row["success"])),
+            latency_ms=row["latency_ms"],
+            catalog_count=row["catalog_count"],
+            metadata=json.loads(row["metadata_json"]) if row["metadata_json"] else {},
+            timestamp=datetime.fromisoformat(row["timestamp"]),
+        )
 
     def record(self, event: AnalyticsEvent) -> AnalyticsEvent:
-        self._events.append(event)
+        if self.persist:
+            with self._lock:
+                with self._connect() as conn:
+                    conn.execute(
+                        """
+                        INSERT INTO analytics_events (
+                            event_type,
+                            query_type,
+                            user_level,
+                            success,
+                            latency_ms,
+                            catalog_count,
+                            metadata_json,
+                            timestamp
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            event.event_type,
+                            event.query_type,
+                            event.user_level,
+                            None if event.success is None else int(event.success),
+                            event.latency_ms,
+                            event.catalog_count,
+                            json.dumps(event.metadata),
+                            event.timestamp.isoformat(),
+                        ),
+                    )
+                    conn.commit()
+        else:
+            self._events.append(event)
         return event
 
     def clear(self) -> None:
         self._events.clear()
+        if self.persist:
+            with self._lock:
+                with self._connect() as conn:
+                    conn.execute("DELETE FROM analytics_events")
+                    conn.commit()
 
     def list_events(self) -> List[AnalyticsEvent]:
-        return list(self._events)
+        if not self.persist:
+            return list(self._events)
+
+        with self._lock:
+            with self._connect() as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """
+                    SELECT
+                        event_type,
+                        query_type,
+                        user_level,
+                        success,
+                        latency_ms,
+                        catalog_count,
+                        metadata_json,
+                        timestamp
+                    FROM analytics_events
+                    ORDER BY id ASC
+                    """
+                ).fetchall()
+        return [self._event_from_row(row) for row in rows]
 
     def summary(self) -> Dict[str, Any]:
-        event_counts = Counter(evt.event_type for evt in self._events)
-        query_events = [evt for evt in self._events if evt.query_type is not None]
+        events = self.list_events()
+        event_counts = Counter(evt.event_type for evt in events)
+        query_events = [evt for evt in events if evt.query_type is not None]
         completed = [evt for evt in query_events if evt.success is not None]
         latencies = [evt.latency_ms for evt in query_events if evt.latency_ms is not None]
 
@@ -54,11 +163,11 @@ class AnalyticsStore:
             avg_latency_ms = sum(latencies) / len(latencies)
 
         by_user_level = Counter(
-            evt.user_level for evt in self._events if evt.user_level is not None
+            evt.user_level for evt in events if evt.user_level is not None
         )
 
         return {
-            "total_events": len(self._events),
+            "total_events": len(events),
             "event_type_counts": dict(event_counts),
             "query_events": len(query_events),
             "query_success_rate": success_rate,

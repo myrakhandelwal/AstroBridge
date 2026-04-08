@@ -2,6 +2,7 @@
 
 from datetime import datetime
 import asyncio
+import os
 
 from fastapi import FastAPI
 from fastapi import HTTPException
@@ -20,15 +21,15 @@ from astrobridge.models import Source, Coordinate, Uncertainty, Photometry, Prov
 
 
 class IdentifyRequest(BaseModel):
-  """Request payload for object identification."""
+    """Request payload for object identification."""
 
-  input_text: str = Field(..., description="Object name or natural-language description")
+    input_text: str = Field(..., description="Object name or natural-language description")
 
 
 class BenchmarkRequest(BaseModel):
-  """Request payload for benchmark execution."""
+    """Request payload for benchmark execution."""
 
-  iterations: int = Field(default=20, ge=1, le=10000)
+    iterations: int = Field(default=20, ge=1, le=10000)
 
 
 class WebDemoConnector:
@@ -78,8 +79,9 @@ def build_orchestrator() -> AstroBridgeOrchestrator:
 
 orchestrator = build_orchestrator()
 app = FastAPI(title="AstroBridge Web", version="0.1.0")
-analytics_store = AnalyticsStore()
-job_manager = JobManager()
+state_db_path = os.getenv("ASTROBRIDGE_STATE_DB")
+analytics_store = AnalyticsStore(db_path=state_db_path, persist=True)
+job_manager = JobManager(db_path=state_db_path, persist=True)
 
 
 INDEX_HTML = """

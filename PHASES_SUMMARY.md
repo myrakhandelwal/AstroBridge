@@ -246,6 +246,7 @@ Planned enhancements for production deployment:
    - Add operator-grade observability (request tracing, adapter telemetry, per-catalog latency dashboards)
   - Add a UI action to run the object-identification flow directly from the web console
   - Surface identification errors inline in the web console for immediate feedback
+  - Persist asynchronous job records and analytics telemetry in SQLite state storage
 
 2. **Release Automation**
   - Tag-driven GitHub Actions publishing to PyPI

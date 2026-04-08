@@ -1,8 +1,15 @@
 """Tests for the AstroBridge web frontend endpoints."""
 
+import os
 import time
+from pathlib import Path
 
 from fastapi.testclient import TestClient
+
+os.environ.setdefault(
+    "ASTROBRIDGE_STATE_DB",
+    str(Path(__file__).resolve().parent / "tmp_web_state.db"),
+)
 
 from astrobridge.web.app import app
 
