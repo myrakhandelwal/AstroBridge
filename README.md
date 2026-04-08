@@ -94,6 +94,10 @@ Commands currently developed in AstroBridge:
 11. `pip install -e .[web]`
 	 Installs optional web console dependencies.
 
+## Manuscript Draft
+
+LaTeX manuscript draft for the AI/astronomy paper is available at [docs/astrobridge_ai_astronomy_paper.tex](docs/astrobridge_ai_astronomy_paper.tex).
+
 ## What You Get
 
 * [astrobridge.models](astrobridge/models.py) for `Source`, `Coordinate`, `Uncertainty`, `Photometry`, and `Provenance`
