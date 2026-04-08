@@ -78,3 +78,4 @@ Use [WORKLOG.md](WORKLOG.md) as the running implementation journal for future co
 Store run/test validation artifacts in [logs/](logs/) for reproducible handoff checkpoints.
 
 The next major step is implementing real catalog connectors and unskipping integration tests that currently depend on live connector behavior.
+The async connector surface (`query_object`, `cone_search`) is now scaffolded to support that implementation.

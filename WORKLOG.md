@@ -18,3 +18,6 @@
 
 ### Next Step
 - Implement production connectors with real external catalog access and explicit timeout/retry policies.
+
+### Next Step Progress
+- Added async-compatible connector methods (`query_object`, `cone_search`) in astrobridge/connectors.py to establish the integration API surface for live-catalog work.

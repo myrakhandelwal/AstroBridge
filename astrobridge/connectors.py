@@ -1,7 +1,7 @@
 """External catalog connectors."""
 from typing import List, Optional
 from abc import ABC, abstractmethod
-from .models import Source
+from .models import Coordinate, Source
 
 
 class CatalogConnector(ABC):
@@ -11,6 +11,15 @@ class CatalogConnector(ABC):
     def query(self, name: str) -> Optional[Source]:
         """Query catalog for a source."""
         pass
+
+    async def query_object(self, name: str) -> List[Source]:
+        """Async-compatible object lookup used by integration paths."""
+        result = self.query(name)
+        return [result] if result is not None else []
+
+    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> List[Source]:
+        """Async-compatible cone search placeholder for future live catalog queries."""
+        return []
 
 
 class SimbadConnector(CatalogConnector):
