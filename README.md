@@ -145,6 +145,8 @@ For detailed information:
 
 2. **[docs/ALGORITHM_AND_SCIENCE.md](docs/ALGORITHM_AND_SCIENCE.md)** — Deep dive into the Bayesian matching algorithm, mathematical foundations, photometric and astrometric likelihoods, proper-motion corrections, and practical examples with real data.
 
+3. **[docs/ARCHITECTURE_GUIDE.md](docs/ARCHITECTURE_GUIDE.md)** — System architecture, component design, advanced usage patterns, custom catalog adapters, batch processing, reproducible workflows, and teaching applications for research and education.
+
 ## Package API Reference (Current)
 
 Key public classes/functions currently implemented:
