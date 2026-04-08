@@ -1,6 +1,5 @@
 """Integration tests for full matching pipeline."""
 import pytest
-import asyncio
 from astrobridge.connectors import SimbadConnector, NEDConnector
 from astrobridge.matching import BayesianMatcher, MatcherConfig, ObjectType
 from astrobridge.models import (
@@ -8,7 +7,6 @@ from astrobridge.models import (
 )
 
 
-@pytest.mark.skip(reason="Requires implementation of cone_search method on connectors")
 @pytest.mark.asyncio
 class TestMatchingPipeline:
     """Test full matching pipeline with real connectors."""
@@ -50,8 +48,8 @@ class TestMatchingPipeline:
             
             # Verify match structure
             for match in matches:
-                assert match.source_ref in [s.id for s in simbad_results]
-                assert match.source_match in [s.id for s in ned_results]
+                assert match.source1_id in [s.id for s in simbad_results]
+                assert match.source2_id in [s.id for s in ned_results]
                 assert 0.0 <= match.match_probability <= 1.0
 
 

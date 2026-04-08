@@ -58,7 +58,7 @@ It uses synthetic data so it can run without external catalog access.
 
 The test suite uses `pytest-asyncio`, which is included in the `dev` extra.
 
-Live catalog connectors are scaffolded for extension. The current connector classes are intentionally lightweight placeholders, so production deployment should replace them with real catalog-backed implementations, rate limiting, and error handling appropriate to the target service.
+Simbad and NED currently use deterministic local datasets for fast, reliable development and CI validation.
 
 ## Project Layout
 
@@ -70,7 +70,7 @@ Live catalog connectors are scaffolded for extension. The current connector clas
 
 ## Status
 
-The repository currently passes its test suite in the default virtual environment when the dev dependencies are installed.
+The repository currently passes its full test suite (73/73) in the default virtual environment when the dev dependencies are installed.
 
 ## Handoff Notes
 
@@ -78,4 +78,6 @@ Use [WORKLOG.md](WORKLOG.md) as the running implementation journal for future co
 Store run/test validation artifacts in [logs/](logs/) for reproducible handoff checkpoints.
 
 The next major step is implementing real catalog connectors and unskipping integration tests that currently depend on live connector behavior.
-The async connector surface (`query_object`, `cone_search`) is now scaffolded to support that implementation.
+Simbad and NED now include deterministic local implementations for `query_object` and `cone_search`, and integration matching tests run without skips.
+
+The next major step is replacing deterministic local connector datasets with live external catalog access plus explicit timeout/retry and rate-limiting policies.
