@@ -30,12 +30,32 @@ class CatalogConnector(ABC):
 
     @staticmethod
     def _normalized_name(name: str) -> str:
-        """Normalize object names for robust matching."""
+        """Normalize object names for robust matching.
+        
+        Removes whitespace and special characters, converts to lowercase.
+        
+        Args:
+            name: Object name to normalize.
+            
+        Returns:
+            Normalized alphanumeric lowercase name.
+        """
         return "".join(ch.lower() for ch in name if ch.isalnum())
 
     @staticmethod
     def _distance_arcsec(coord1: Coordinate, coord2: Coordinate) -> float:
-        """Compute simple angular separation in arcseconds."""
+        """Compute simple angular separation in arcseconds.
+        
+        Uses flat-sky approximation (Euclidean distance in RA/Dec space).
+        Appropriate for small separations where |Δ| < a few degrees.
+        
+        Args:
+            coord1: First coordinate.
+            coord2: Second coordinate.
+            
+        Returns:
+            Angular separation in arcseconds.
+        """
         d_ra = coord1.ra - coord2.ra
         d_dec = coord1.dec - coord2.dec
         return ((d_ra * d_ra + d_dec * d_dec) ** 0.5) * 3600.0
@@ -51,7 +71,23 @@ def _build_source(
     catalog_name: str,
     catalog_version: str,
 ) -> Source:
-    """Create a deterministic Source object for local connector datasets."""
+    """Create a deterministic Source object for local connector datasets.
+    
+    Used by deterministic connectors (SIMBAD, NED) that return
+    synthetic data for testing and demo purposes.
+    
+    Args:
+        source_id: Unique identifier in source catalog.
+        name: Human-readable source name.
+        ra: Right ascension in degrees.
+        dec: Declination in degrees.
+        magnitude: Apparent magnitude in V-band.
+        catalog_name: Name of origin catalog.
+        catalog_version: Version string of catalog.
+        
+    Returns:
+        Fully instantiated Source object.
+    """
     return Source(
         id=source_id,
         name=name,

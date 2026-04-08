@@ -55,12 +55,21 @@ class DemoConnector:
         )
 
 
-def print_section(title):
+def print_section(title: str) -> None:
+    """Print a formatted section header.
+    
+    Args:
+        title: Section title to print.
+    """
     print(f"  {title}")
 
 
-def demo_phase5_routing():
-    """Demo Phase 5: Intelligent Query Routing"""
+def demo_phase5_routing() -> None:
+    """Demo Phase 5: Intelligent Query Routing.
+    
+    Demonstrates how the NLP router classifies astronomical targets
+    and ranks catalogs based on object type and query properties.
+    """
     print_section("PHASE 5: INTELLIGENT QUERY ROUTING")
     
     router = NLPQueryRouter()
@@ -87,8 +96,12 @@ def demo_phase5_routing():
         print(f"  Reasoning: {decision.reasoning}\n")
 
 
-def demo_phase4_matching():
-    """Demo Phase 4: Probabilistic Matching"""
+def demo_phase4_matching() -> None:
+    """Demo Phase 4: Probabilistic Matching.
+    
+    Demonstrates the Bayesian matcher's probability calculation
+    for nearby vs distant sources, and shows confidence scoring.
+    """
     print_section("PHASE 4: PROBABILISTIC BAYESIAN MATCHING")
     
     # Create sample sources
@@ -152,8 +165,13 @@ def demo_phase4_matching():
         print(f"    Confidence: {match.confidence:.2f}\n")
 
 
-async def demo_phase6_orchestration():
-    """Demo Phase 6: API Orchestration"""
+async def demo_phase6_orchestration() -> None:
+    """Demo Phase 6: Async Orchestration.
+    
+    Demonstrates end-to-end query execution: routing selection,
+    multi-catalog querying, cross-matching, and confidence scoring.
+    Uses async/await for concurrent catalog access.
+    """
     print_section("PHASE 6: API ORCHESTRATION")
     
     # Create orchestrator with router
@@ -202,8 +220,12 @@ async def demo_phase6_orchestration():
             print(f"  Errors: {response.errors}")
 
 
-def demo_phase7_identification():
-    """Demo Phase 7: AI-Assisted Object Identification"""
+def demo_phase7_identification() -> None:
+    """Demo Phase 7: AI-Assisted Object Identification.
+    
+    Shows how the identify_object command classifies astronomical targets
+    by text and returns structured results with descriptions and search hints.
+    """
     print_section("PHASE 7: AI-ASSISTED OBJECT IDENTIFICATION")
 
     inputs = [
@@ -218,8 +240,12 @@ def demo_phase7_identification():
         print()
 
 
-def demo_phase8_telemetry_and_jobs():
-    """Demo Phase 8: Telemetry, Persistence, and Async Jobs"""
+def demo_phase8_telemetry_and_jobs() -> None:
+    """Demo Phase 8: Telemetry, Persistence, and Async Jobs.
+    
+    Demonstrates analytics event recording, SQLite-backed persistence,
+    and asynchronous job submission and result retrieval.
+    """
     print_section("PHASE 8: TELEMETRY, PERSISTENCE, AND ASYNC JOBS")
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -276,8 +302,12 @@ def demo_phase8_telemetry_and_jobs():
         print(f"  Result message: {loaded.result['message'] if loaded and loaded.result else 'missing'}")
 
 
-async def demo_phase9_benchmarking():
-    """Demo Phase 9: Reproducible Benchmarking"""
+async def demo_phase9_benchmarking() -> None:
+    """Demo Phase 9: Reproducible Benchmarking.
+    
+    Runs a multi-iteration benchmark to measure query latency,
+    success rate, and latency percentiles (p50, p95).
+    """
     print_section("PHASE 9: REPRODUCIBLE BENCHMARKING")
 
     orchestrator = AstroBridgeOrchestrator()
@@ -297,8 +327,13 @@ async def demo_phase9_benchmarking():
     print(f"Latency p95: {result['latency_ms']['p95']:.2f} ms")
 
 
-def demo_phase2_models():
-    """Demo Phase 2: Type-Safe Domain Models"""
+def demo_phase2_models() -> None:
+    """Demo Phase 2: Type-Safe Domain Models.
+    
+    Showcases the core Pydantic-based astronomical data models:
+    Coordinate, Uncertainty, Photometry, Provenance, and Source.
+    Demonstrates type safety and field validation.
+    """
     print_section("PHASE 2: CANONICAL DOMAIN MODELS")
     
     print("Creating type-safe astronomical source model:\n")
@@ -333,8 +368,13 @@ def demo_phase2_models():
     print(f"\n✓ All fields type-validated by Pydantic")
 
 
-def main():
-    """Run all demos"""
+def main() -> None:
+    """Run all demos sequentially.
+    
+    Executes the complete AstroBridge feature walkthrough:
+    models, routing, matching, orchestration, identification,
+    telemetry & jobs, and benchmarking.
+    """
     print("\n" + "="*70)
     print("  ASTROBRIDGE: AI-DRIVEN ASTRONOMICAL SOURCE MATCHING")
     print("  Full Package Capability Demo")

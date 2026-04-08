@@ -50,6 +50,14 @@ DEFAULT_SEARCH_RADII = {
 
 
 def _catalog_label(catalog: CatalogType) -> str:
+    """Format catalog type as uppercase label.
+    
+    Args:
+        catalog: Catalog type to format.
+        
+    Returns:
+        Uppercase catalog name string.
+    """
     return catalog.value.upper()
 
 
@@ -76,7 +84,21 @@ class IdentificationResult:
 
 
 def identify_object(input_text: str, router: Optional[NLPQueryRouter] = None) -> IdentificationResult:
-    """Classify an object or query string and generate a short explanation."""
+    """Classify an object or query string and generate a short explanation.
+    
+    Combines built-in designation hints (for common targets like M31, Proxima Centauri)
+    with NLP routing logic. Falls back to general-purpose catalog ordering for unknown objects.
+    
+    Args:
+        input_text: Target designation or query (e.g., 'M31', 'Find red dwarfs').
+        router: Optional NLPQueryRouter; creates default router if not provided.
+        
+    Returns:
+        IdentificationResult with object class, description, search radius, and catalogs.
+        
+    Raises:
+        ValueError: If input_text is empty or whitespace-only.
+    """
     normalized = input_text.strip()
     if not normalized:
         raise ValueError("input_text must not be empty")
@@ -121,7 +143,17 @@ def identify_object(input_text: str, router: Optional[NLPQueryRouter] = None) ->
 
 
 def format_identification(result: IdentificationResult) -> str:
-    """Format an identification result for terminal output."""
+    """Format an identification result for terminal output.
+    
+    Produces a human-readable multi-line summary of object classification,
+    recommended search strategy, and top catalogs.
+    
+    Args:
+        result: IdentificationResult from identify_object().
+        
+    Returns:
+        Formatted string summary ready for console output.
+    """
     top_catalogs = ", ".join(result.top_catalogs) if result.top_catalogs else "none"
     lines = [
         f"Input: {result.input_text}",
