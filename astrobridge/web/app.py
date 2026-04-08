@@ -1,6 +1,7 @@
 """Minimal FastAPI frontend for AstroBridge."""
 
 from datetime import datetime
+import asyncio
 
 from fastapi import FastAPI
 from fastapi import HTTPException
@@ -10,6 +11,9 @@ from pydantic import BaseModel, Field
 from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
 from astrobridge.matching import BayesianMatcher
 from astrobridge.identify import identify_object
+from astrobridge.analytics import AnalyticsEvent, AnalyticsStore
+from astrobridge.jobs import JobManager
+from astrobridge.benchmarking import BenchmarkConfig, BenchmarkRunner
 from astrobridge.routing import NLPQueryRouter
 from astrobridge.routing.base import CatalogType
 from astrobridge.models import Source, Coordinate, Uncertainty, Photometry, Provenance
@@ -19,6 +23,12 @@ class IdentifyRequest(BaseModel):
   """Request payload for object identification."""
 
   input_text: str = Field(..., description="Object name or natural-language description")
+
+
+class BenchmarkRequest(BaseModel):
+  """Request payload for benchmark execution."""
+
+  iterations: int = Field(default=20, ge=1, le=10000)
 
 
 class WebDemoConnector:
@@ -68,6 +78,8 @@ def build_orchestrator() -> AstroBridgeOrchestrator:
 
 orchestrator = build_orchestrator()
 app = FastAPI(title="AstroBridge Web", version="0.1.0")
+analytics_store = AnalyticsStore()
+job_manager = JobManager()
 
 
 INDEX_HTML = """
@@ -375,7 +387,19 @@ async def index() -> HTMLResponse:
 
 @app.post("/api/query")
 async def run_query(request: QueryRequest):
-    return await orchestrator.execute_query(request)
+  started = datetime.utcnow()
+  response = await orchestrator.execute_query(request)
+  elapsed_ms = (datetime.utcnow() - started).total_seconds() * 1000
+  analytics_store.record(
+    AnalyticsEvent(
+      event_type="query_executed",
+      query_type=request.query_type,
+      success=(response.status != "error"),
+      latency_ms=elapsed_ms,
+      catalog_count=len(response.catalogs_queried),
+    )
+  )
+  return response
 
 
 @app.post("/api/identify")
@@ -384,6 +408,14 @@ async def run_identify(request: IdentifyRequest):
     result = identify_object(request.input_text)
   except ValueError as exc:
     raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  analytics_store.record(
+    AnalyticsEvent(
+      event_type="identify_executed",
+      query_type="identify",
+      success=True,
+    )
+  )
 
   return {
     "status": "success",
@@ -394,6 +426,61 @@ async def run_identify(request: IdentifyRequest):
     "top_catalogs": result.top_catalogs,
     "reasoning": result.reasoning,
   }
+
+
+@app.post("/api/jobs")
+async def submit_job(request: QueryRequest):
+  job_id = await job_manager.submit_query(request, orchestrator)
+  analytics_store.record(
+    AnalyticsEvent(event_type="job_submitted", query_type=request.query_type, success=True)
+  )
+  return {"job_id": job_id, "status": "queued"}
+
+
+@app.get("/api/jobs/{job_id}")
+async def job_status(job_id: str):
+  job = job_manager.get_job(job_id)
+  if job is None:
+    raise HTTPException(status_code=404, detail="Job not found")
+  return job.model_dump()
+
+
+@app.get("/api/jobs/{job_id}/result")
+async def job_result(job_id: str):
+  job = job_manager.get_job(job_id)
+  if job is None:
+    raise HTTPException(status_code=404, detail="Job not found")
+  if job.status == "failed":
+    raise HTTPException(status_code=500, detail=job.error or "Job failed")
+  if job.status != "completed" or job.result is None:
+    raise HTTPException(status_code=202, detail="Job still running")
+  return job.result
+
+
+@app.post("/api/analytics/event")
+async def record_analytics_event(event: AnalyticsEvent):
+  stored = analytics_store.record(event)
+  return {"status": "recorded", "event": stored.model_dump()}
+
+
+@app.get("/api/analytics/summary")
+async def analytics_summary():
+  return analytics_store.summary()
+
+
+@app.post("/api/benchmark/run")
+async def run_benchmark(request: BenchmarkRequest):
+  runner = BenchmarkRunner(orchestrator)
+  result = await runner.run(BenchmarkConfig(iterations=request.iterations))
+  analytics_store.record(
+    AnalyticsEvent(
+      event_type="benchmark_executed",
+      query_type="benchmark",
+      success=True,
+      metadata={"iterations": request.iterations},
+    )
+  )
+  return result
 
 
 def main() -> None:

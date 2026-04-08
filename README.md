@@ -98,6 +98,28 @@ Commands currently developed in AstroBridge:
 
 LaTeX manuscript draft for the AI/astronomy paper is available at [docs/astrobridge_ai_astronomy_paper.tex](docs/astrobridge_ai_astronomy_paper.tex).
 
+## Advanced API Endpoints
+
+The following production-foundation endpoints are now available in the FastAPI app:
+
+1. `POST /api/jobs`
+	Submit an asynchronous query job for longer-running workloads.
+
+2. `GET /api/jobs/{job_id}`
+	Check background job status (`queued`, `running`, `completed`, `failed`).
+
+3. `GET /api/jobs/{job_id}/result`
+	Fetch completed job output.
+
+4. `POST /api/analytics/event`
+	Record educational or operational analytics events.
+
+5. `GET /api/analytics/summary`
+	Return aggregate analytics summary for tracked events.
+
+6. `POST /api/benchmark/run`
+	Execute a reproducible benchmark run and return latency/success metrics.
+
 ## What You Get
 
 * [astrobridge.models](astrobridge/models.py) for `Source`, `Coordinate`, `Uncertainty`, `Photometry`, and `Provenance`

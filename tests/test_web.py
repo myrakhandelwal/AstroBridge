@@ -1,5 +1,7 @@
 """Tests for the AstroBridge web frontend endpoints."""
 
+import time
+
 from fastapi.testclient import TestClient
 
 from astrobridge.web.app import app
@@ -33,3 +35,60 @@ def test_query_and_identify_pages_load():
     assert home.status_code == 200
     assert "AstroBridge Web Console" in home.text
     assert "Object Identification" in home.text
+
+
+def test_submit_job_and_fetch_result():
+    submit = client.post(
+        "/api/jobs",
+        json={
+            "query_type": "name",
+            "name": "Proxima Centauri",
+            "auto_route": True,
+        },
+    )
+    assert submit.status_code == 200
+    job_id = submit.json()["job_id"]
+
+    # Poll briefly for completion in background task.
+    for _ in range(20):
+        status = client.get(f"/api/jobs/{job_id}")
+        assert status.status_code == 200
+        payload = status.json()
+        if payload["status"] == "completed":
+            break
+        time.sleep(0.05)
+
+    result = client.get(f"/api/jobs/{job_id}/result")
+    assert result.status_code == 200
+    body = result.json()
+    assert body["query_type"] == "name"
+
+
+def test_analytics_summary_endpoint():
+    rec = client.post(
+        "/api/analytics/event",
+        json={
+            "event_type": "education_interaction",
+            "query_type": "identify",
+            "user_level": "beginner",
+            "success": True,
+            "latency_ms": 12.5,
+        },
+    )
+    assert rec.status_code == 200
+
+    summary = client.get("/api/analytics/summary")
+    assert summary.status_code == 200
+    data = summary.json()
+    assert data["total_events"] >= 1
+    assert "event_type_counts" in data
+
+
+def test_benchmark_endpoint_runs():
+    response = client.post("/api/benchmark/run", json={"iterations": 3})
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["iterations"] == 3
+    assert "success_rate" in data
+    assert "latency_ms" in data
