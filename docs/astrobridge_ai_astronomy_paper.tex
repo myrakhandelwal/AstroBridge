@@ -198,6 +198,28 @@ Advanced & Research methodology, publication & Literature review support, statis
 
 This draft includes benchmark placeholders and plotting scaffolds; final numeric claims should be tied to reproducible experiment scripts and versioned datasets.
 
+\subsection{Current Code-to-Paper Alignment}
+To make scope explicit, Table~\ref{tab:alignment_matrix} maps the major paper claims to current implementation status.
+
+\begin{table}[H]
+\centering
+\caption{Implementation Alignment Matrix}
+\label{tab:alignment_matrix}
+\begin{tabular}{p{4.2cm} p{2.6cm} p{6.2cm}}
+\toprule
+\textbf{Paper Capability} & \textbf{Status} & \textbf{Current Evidence in Codebase} \\
+\midrule
+Intelligent query routing & Implemented & NLP router with object classification and ranked catalog selection \\
+Probabilistic cross-matching & Implemented & Bayesian matcher with confidence scoring and weighting profiles \\
+Proper-motion-aware matching & Implemented & Epoch-aware matching controls in API and matcher \\
+Unified interfaces (CLI/API/web) & Implemented & CLI commands, REST endpoints, and optional web console \\
+Educational assistant workflow & Partial & Identification assistant and explanatory outputs; no full LMS integration \\
+Institution-scale streaming ops & Planned & Architecture defined, but no distributed production deployment yet \\
+Formal benchmark suite for all claims & Planned & Test suite exists; publication-grade benchmark protocol still pending \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \section{Discussion and Future Work}
 \label{sec:discussion}
 
@@ -205,6 +227,56 @@ This draft includes benchmark placeholders and plotting scaffolds; final numeric
     \item \textbf{Data Heterogeneity:} Different coordinate systems and photometric calibrations
     \item \textbf{AI Interpretability:} Need for explainable AI in scientific contexts
     \item \textbf{Scalability:} LSST-era data volumes require distributed compute
+\end{itemize}
+
+\subsection{Institution-Scale Next Steps}
+For large-scale institutions (national observatories, survey brokers, and archive centers), the immediate roadmap is:
+
+\begin{enumerate}
+    \item \textbf{Phase 0 (0--3 months): Production Baseline}
+    \begin{itemize}
+        \item Containerized deployment and environment pinning
+        \item Centralized structured logging and request IDs
+        \item SLO definitions for latency, uptime, and query success rate
+    \end{itemize}
+
+    \item \textbf{Phase 1 (3--6 months): Reliability and Security}
+    \begin{itemize}
+        \item Authentication/authorization and role-based access control
+        \item Rate limiting, retry budgets, and abuse protection
+        \item Secrets management and dependency vulnerability scanning
+    \end{itemize}
+
+    \item \textbf{Phase 2 (6--12 months): Data Plane Scaling}
+    \begin{itemize}
+        \item Asynchronous job queue for long-running cross-matches
+        \item Distributed workers for batch and streaming ingestion
+        \item Query/result persistence for provenance and reproducibility
+    \end{itemize}
+
+    \item \textbf{Phase 3 (12--18 months): Observatory Integration}
+    \begin{itemize}
+        \item Standards-first interoperability (IVOA TAP/ADQL/VOTable contracts)
+        \item Institution-specific connector plugins and metadata normalization
+        \item Cross-site validation with mirrored benchmark datasets
+    \end{itemize}
+
+    \item \textbf{Phase 4 (18+ months): Scientific Operations}
+    \begin{itemize}
+        \item Drift monitoring for routing and matching quality
+        \item Human-in-the-loop adjudication for ambiguous associations
+        \item Governance policy for model updates and reproducible releases
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Evaluation Plan for Large-Scale Adoption}
+Before claiming institution-scale readiness, the system should publish:
+
+\begin{itemize}
+    \item A fixed benchmark corpus (multi-catalog, multi-epoch, labeled pairs)
+    \item Task metrics: precision/recall, calibration error, and latency percentiles
+    \item Stress tests at broker-like throughput envelopes
+    \item Reproducible experiment manifests tied to released model/config versions
 \end{itemize}
 
 \section{Conclusion}
