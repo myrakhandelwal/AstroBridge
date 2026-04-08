@@ -99,3 +99,8 @@
 - Added browser query controls for query type, proper-motion toggle, match epoch, weighting profile, and optional custom weights.
 - Added live result panels for query status, catalogs queried, sources returned, and errors.
 - Added package extras and CLI entrypoint support for web launch in setup.py (`astrobridge-web`).
+
+### 2026-04-08 Release Automation
+- Added a GitHub Actions workflow for tag-triggered PyPI publishing.
+- Workflow builds the package and uploads distributions when a `v*` tag is pushed.
+- Publishing requires a GitHub secret named `PYPI_API_TOKEN`.

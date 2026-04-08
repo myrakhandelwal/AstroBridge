@@ -245,17 +245,22 @@ Planned enhancements for production deployment:
    - Add async job endpoints for long-running cross-match workloads
    - Add operator-grade observability (request tracing, adapter telemetry, per-catalog latency dashboards)
 
-2. **Performance Optimization**
+2. **Release Automation**
+  - Tag-driven GitHub Actions publishing to PyPI
+  - Version bump workflow for future releases
+  - Optional trusted publishing setup to remove long-lived upload tokens
+
+3. **Performance Optimization**
    - Caching strategies for repeated queries
    - Query result pagination
    - Batch query support
 
-3. **Documentation**
+4. **Documentation**
    - API endpoint documentation (OpenAPI/Swagger)
    - User guide for query construction
    - Developer guide for connector implementation
 
-4. **Monitoring & Observability**
+5. **Monitoring & Observability**
    - Distributed tracing (OpenTelemetry)
    - Metrics collection (Prometheus)
    - Query performance analytics
