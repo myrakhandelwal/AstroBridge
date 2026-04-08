@@ -10,7 +10,7 @@ long_description = README.read_text(encoding="utf-8") if README.exists() else ""
 
 setup(
     name="astrobridge",
-    version="0.1.0",
+    version="0.1.1",
     description="Astronomical source matching and cross-catalog orchestration",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -39,6 +39,7 @@ setup(
     entry_points={
         "console_scripts": [
             "astrobridge-demo=demo:main",
+            "astrobridge-identify=astrobridge.identify:main",
             "astrobridge-web=astrobridge.web.app:main",
         ]
     },
