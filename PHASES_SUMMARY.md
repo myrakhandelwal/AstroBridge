@@ -190,6 +190,18 @@ Phase 6: API          - 21 tests (100% pass rate)
 
 TOTAL: 106 tests passing, 0 skipped
 Success Rate: 100% pass rate on active tests
+
+## Demo Coverage
+
+The package demo now covers the full shipped feature set:
+
+- canonical models and provenance
+- intelligent query routing
+- probabilistic matching and confidence scoring
+- API orchestration
+- object identification with human-readable explanations
+- telemetry, persisted job records, and analytics summaries
+- reproducible benchmarking
 ```
 
 ---

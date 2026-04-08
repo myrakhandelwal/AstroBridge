@@ -207,12 +207,15 @@ The web console includes these controls directly in the UI so users can run inte
 
 ## Demo Flow
 
-The demo script walks through the core phases in order:
+The demo script walks through the core phases in order and now covers the full package surface:
 
 1. canonical models
 2. intelligent routing
 3. Bayesian matching
 4. async orchestration
+5. object identification
+6. telemetry, persistence, and background jobs
+7. reproducible benchmarking
 
 It uses synthetic data so it can run without external catalog access.
 

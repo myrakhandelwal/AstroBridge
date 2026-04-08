@@ -119,3 +119,8 @@
 - Added SQLite persistence for analytics events and asynchronous job records.
 - Added `ASTROBRIDGE_STATE_DB` support to configure state database location.
 - Added persistence tests to verify data survives store/manager re-instantiation.
+
+### 2026-04-08 Full Package Demo Expansion
+- Expanded `demo.py` to cover identification, telemetry, persistence, background jobs, and benchmarking.
+- Updated the demo summary to report all currently shipped package capabilities.
+- Reframed the documentation so the demo is described as a full package walkthrough.

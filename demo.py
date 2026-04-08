@@ -4,12 +4,18 @@ AstroBridge Demo - Interactive demonstration of all 6 phases
 """
 
 import asyncio
+import os
+import tempfile
 from datetime import datetime
 from astrobridge.routing import NLPQueryRouter
 from astrobridge.routing.base import CatalogType, ObjectClass
 from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
 from astrobridge.matching import BayesianMatcher, MatcherConfig
 from astrobridge.models import Source, Coordinate, Uncertainty, Photometry, Provenance
+from astrobridge.identify import identify_object, format_identification
+from astrobridge.analytics import AnalyticsEvent, AnalyticsStore
+from astrobridge.jobs import JobManager, JobRecord
+from astrobridge.benchmarking import BenchmarkConfig, BenchmarkRunner
 
 
 class DemoConnector:
@@ -196,6 +202,101 @@ async def demo_phase6_orchestration():
             print(f"  Errors: {response.errors}")
 
 
+def demo_phase7_identification():
+    """Demo Phase 7: AI-Assisted Object Identification"""
+    print_section("PHASE 7: AI-ASSISTED OBJECT IDENTIFICATION")
+
+    inputs = [
+        "M31",
+        "Proxima Centauri",
+        "Find nearby red dwarf stars",
+    ]
+
+    for item in inputs:
+        result = identify_object(item)
+        print(format_identification(result))
+        print()
+
+
+def demo_phase8_telemetry_and_jobs():
+    """Demo Phase 8: Telemetry, Persistence, and Async Jobs"""
+    print_section("PHASE 8: TELEMETRY, PERSISTENCE, AND ASYNC JOBS")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        state_db = os.path.join(temp_dir, "state.db")
+        analytics_store = AnalyticsStore(db_path=state_db, persist=True)
+        job_manager = JobManager(db_path=state_db, persist=True)
+
+        analytics_store.record(
+            AnalyticsEvent(
+                event_type="demo_query",
+                query_type="identify",
+                user_level="beginner",
+                success=True,
+                latency_ms=12.4,
+                catalog_count=3,
+                metadata={"demo": True},
+            )
+        )
+        analytics_store.record(
+            AnalyticsEvent(
+                event_type="demo_query",
+                query_type="name",
+                user_level="advanced",
+                success=True,
+                latency_ms=8.6,
+                catalog_count=3,
+                metadata={"demo": True},
+            )
+        )
+
+        summary = analytics_store.summary()
+        print("Analytics summary:")
+        print(f"  Total events: {summary['total_events']}")
+        print(f"  Success rate: {summary['query_success_rate']:.2f}")
+        print(f"  Average latency: {summary['average_latency_ms']:.2f} ms")
+
+        persisted_store = AnalyticsStore(db_path=state_db, persist=True)
+        print(f"  Reloaded persisted events: {len(persisted_store.list_events())}")
+
+        record = JobRecord(
+            job_id="demo-job-1",
+            status="completed",
+            created_at=datetime.utcnow(),
+            started_at=datetime.utcnow(),
+            finished_at=datetime.utcnow(),
+            result={"status": "success", "message": "Demo background job completed"},
+        )
+        job_manager._save_record(record)
+        reloaded_job_manager = JobManager(db_path=state_db, persist=True)
+        loaded = reloaded_job_manager.get_job("demo-job-1")
+        print("Background job persistence:")
+        print(f"  Job ID: {loaded.job_id if loaded else 'missing'}")
+        print(f"  Status: {loaded.status if loaded else 'missing'}")
+        print(f"  Result message: {loaded.result['message'] if loaded and loaded.result else 'missing'}")
+
+
+async def demo_phase9_benchmarking():
+    """Demo Phase 9: Reproducible Benchmarking"""
+    print_section("PHASE 9: REPRODUCIBLE BENCHMARKING")
+
+    orchestrator = AstroBridgeOrchestrator()
+    orchestrator.set_router(NLPQueryRouter())
+    orchestrator.set_matcher(BayesianMatcher())
+
+    for catalog in CatalogType:
+        orchestrator.add_connector(catalog.value, DemoConnector(catalog.value))
+
+    runner = BenchmarkRunner(orchestrator)
+    result = await runner.run(BenchmarkConfig(iterations=9))
+
+    print(f"Benchmark iterations: {result['iterations']}")
+    print(f"Success rate: {result['success_rate']:.2f}")
+    print(f"Latency mean: {result['latency_ms']['mean']:.2f} ms")
+    print(f"Latency p50: {result['latency_ms']['p50']:.2f} ms")
+    print(f"Latency p95: {result['latency_ms']['p95']:.2f} ms")
+
+
 def demo_phase2_models():
     """Demo Phase 2: Type-Safe Domain Models"""
     print_section("PHASE 2: CANONICAL DOMAIN MODELS")
@@ -236,7 +337,7 @@ def main():
     """Run all demos"""
     print("\n" + "="*70)
     print("  ASTROBRIDGE: AI-DRIVEN ASTRONOMICAL SOURCE MATCHING")
-    print("  6-Phase Implementation Demo")
+    print("  Full Package Capability Demo")
     print("="*70)
     
     # Phase 2: Models
@@ -252,6 +353,15 @@ def main():
     print_section("PHASE 6: API ORCHESTRATION")
     print("Running async query orchestration demo...\n")
     asyncio.run(demo_phase6_orchestration())
+
+    # Phase 7: Identification
+    demo_phase7_identification()
+
+    # Phase 8: Telemetry, persistence, jobs
+    demo_phase8_telemetry_and_jobs()
+
+    # Phase 9: Benchmarking (async)
+    asyncio.run(demo_phase9_benchmarking())
     
     # Summary
     print_section("DEMO COMPLETE")
@@ -261,6 +371,9 @@ def main():
     print("✓ Phase 4: Probabilistic Matching - Bayesian inference shown")
     print("✓ Phase 5: Query Routing - NLP classification demonstrated")
     print("✓ Phase 6: API Orchestration - Async query execution shown")
+    print("✓ Phase 7: AI Identification - Explanatory object descriptions shown")
+    print("✓ Phase 8: Telemetry & Jobs - Persistent analytics and job tracking shown")
+    print("✓ Phase 9: Benchmarking - Reproducible performance measurements shown")
     print("\nAstroBridge system is fully operational and ready for production!\n")
 
 
