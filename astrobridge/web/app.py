@@ -3,13 +3,22 @@
 from datetime import datetime
 
 from fastapi import FastAPI
+from fastapi import HTTPException
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, Field
 
 from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
 from astrobridge.matching import BayesianMatcher
+from astrobridge.identify import identify_object
 from astrobridge.routing import NLPQueryRouter
 from astrobridge.routing.base import CatalogType
 from astrobridge.models import Source, Coordinate, Uncertainty, Photometry, Provenance
+
+
+class IdentifyRequest(BaseModel):
+  """Request payload for object identification."""
+
+  input_text: str = Field(..., description="Object name or natural-language description")
 
 
 class WebDemoConnector:
@@ -131,6 +140,13 @@ INDEX_HTML = """
       margin-bottom: 6px;
     }
     .meta { color: var(--muted); font-size: 0.9rem; }
+    .split { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .panel {
+      border: 1px solid #e8ecef;
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+    }
     table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 0.9rem; }
     th, td { border-bottom: 1px solid #eceff3; text-align: left; padding: 7px 6px; }
     .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
@@ -207,6 +223,22 @@ INDEX_HTML = """
       <div id="catalogs" style="margin-top:10px"></div>
       <div id="sources"></div>
       <div id="errors" style="margin-top:10px"></div>
+      <hr style="margin:16px 0;border:none;border-top:1px solid #e8ecef;" />
+      <h3>Object Identification</h3>
+      <div class="split">
+        <div class="panel">
+          <label>Identify an object or sky target</label>
+          <input id="identifyText" value="M31" placeholder="Try M31, Proxima Centauri, or a natural-language query" />
+          <div class="btns">
+            <button class="primary" id="identifyBtn">Identify Object</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div id="identifyStatus" class="meta">Idle.</div>
+          <div id="identifyResult" style="margin-top:8px"></div>
+          <div id="identifyErrors" style="margin-top:10px"></div>
+        </div>
+      </div>
     </section>
   </div>
 </div>
@@ -294,10 +326,42 @@ async function runQuery() {
   }
 }
 
+async function runIdentify() {
+  const inputText = q("identifyText").value;
+  setHtml("identifyStatus", "<span class='warn'>Identifying...</span>");
+  setHtml("identifyResult", "");
+  setHtml("identifyErrors", "");
+
+  try {
+    const res = await fetch("/api/identify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input_text: inputText }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.detail || data.error || "Identification failed");
+    }
+
+    setHtml("identifyStatus", `<span class='ok'>${data.object_class.toUpperCase()}</span> · ${data.search_radius_arcsec.toFixed(1)} arcsec`);
+    setHtml("identifyResult", `
+      <div><b>Input:</b> ${data.input_text}</div>
+      <div style="margin-top:6px">${data.description}</div>
+      <div class="meta" style="margin-top:6px">Top catalogs: ${data.top_catalogs.join(", ")}</div>
+      <div class="meta">Reasoning: ${data.reasoning}</div>
+    `);
+  } catch (err) {
+    setHtml("identifyStatus", `<span class='err'>ERROR</span>`);
+    setHtml("identifyErrors", `<div class='err'>${String(err)}</div>`);
+  }
+}
+
 q("runBtn").addEventListener("click", runQuery);
 q("clearBtn").addEventListener("click", () => {
   ["status", "summary", "catalogs", "sources", "errors"].forEach((id) => setHtml(id, id === "status" ? "Idle." : ""));
 });
+q("identifyBtn").addEventListener("click", runIdentify);
 </script>
 </body>
 </html>
@@ -312,6 +376,24 @@ async def index() -> HTMLResponse:
 @app.post("/api/query")
 async def run_query(request: QueryRequest):
     return await orchestrator.execute_query(request)
+
+
+@app.post("/api/identify")
+async def run_identify(request: IdentifyRequest):
+  try:
+    result = identify_object(request.input_text)
+  except ValueError as exc:
+    raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+  return {
+    "status": "success",
+    "input_text": result.input_text,
+    "object_class": result.object_class.value,
+    "description": result.description,
+    "search_radius_arcsec": result.search_radius_arcsec,
+    "top_catalogs": result.top_catalogs,
+    "reasoning": result.reasoning,
+  }
 
 
 def main() -> None:

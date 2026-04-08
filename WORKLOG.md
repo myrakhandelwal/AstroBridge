@@ -109,3 +109,8 @@
 - Added `astrobridge-identify` as a console script for classifying input text and generating a human-readable object description.
 - The command uses the existing NLP router to infer object class, search radius, and top catalogs.
 - Added focused tests for the new identification helper and CLI formatting output.
+
+### 2026-04-08 Web Identification Panel
+- Added `/api/identify` to the FastAPI web app for live object identification.
+- Added an identification panel to the browser UI with inline success and error output.
+- Added web tests covering valid identification, blank-input rejection, and page rendering.
