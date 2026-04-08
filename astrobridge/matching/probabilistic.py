@@ -4,6 +4,7 @@ import numpy as np
 from datetime import datetime
 from typing import List, Dict, Any, Optional, Tuple
 from astrobridge.models import Source, MatchResult
+from astrobridge.geometry import angular_distance_deg
 from astrobridge.matching.base import Matcher, MatcherError
 from astrobridge.matching.spatial import SpatialIndex
 from astrobridge.matching.confidence import ConfidenceScorer
@@ -349,7 +350,7 @@ class BayesianMatcher(Matcher):
     @staticmethod
     def _angular_distance(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
         """Compute angular distance in degrees (simple Euclidean, not Haversine)."""
-        return np.sqrt((ra1 - ra2)**2 + (dec1 - dec2)**2)
+        return angular_distance_deg(ra1, dec1, ra2, dec2)
 
     @staticmethod
     def _coordinate_at_epoch(source: Source, target_epoch: datetime) -> Tuple[float, float]:

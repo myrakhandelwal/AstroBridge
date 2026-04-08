@@ -270,13 +270,96 @@ class TestQueryExecution:
         """Test error handling in orchestration."""
         orchestrator = AstroBridgeOrchestrator()
         
-        # Query with no parameters (gracefully handled)
-        request = QueryRequest(query_type="name")
+        # Minimal valid query should be handled gracefully.
+        request = QueryRequest(query_type="name", name="Unknown Object")
         response = await orchestrator.execute_query(request)
         
         # Should complete without crashing
         assert response.query_id is not None
         assert response.execution_time_ms > 0
+
+    def test_query_request_requires_payload_per_query_type(self):
+        """QueryRequest should validate required payload by query type."""
+        with pytest.raises(ValueError, match="name is required"):
+            QueryRequest(query_type="name")
+
+        with pytest.raises(ValueError, match="coordinates are required"):
+            QueryRequest(query_type="coordinates")
+
+        with pytest.raises(ValueError, match="description is required"):
+            QueryRequest(query_type="natural_language")
+
+    def test_query_request_rejects_unknown_query_type(self):
+        """QueryRequest should reject unknown query types."""
+        with pytest.raises(ValueError):
+            QueryRequest(query_type="unknown", name="x")
+
+    async def test_execute_query_returns_cross_catalog_matches(self):
+        """Name queries across multiple connectors should emit matches."""
+        from astrobridge.connectors import SimbadConnector, NEDConnector
+
+        orchestrator = AstroBridgeOrchestrator(
+            matcher=BayesianMatcher(confidence_threshold=0.01),
+            connectors={
+                "simbad": SimbadConnector(),
+                "ned": NEDConnector(),
+            },
+        )
+
+        request = QueryRequest(
+            query_type="name",
+            name="Proxima Centauri",
+            catalogs=["simbad", "ned"],
+            auto_route=False,
+        )
+
+        response = await orchestrator.execute_query(request)
+        assert response.status in ["success", "partial"]
+        assert len(response.sources) >= 2
+        assert len(response.matches) >= 1
+
+    async def test_execute_coordinate_query_calls_connector_cone_search(self):
+        """Coordinate queries should delegate to connector cone_search."""
+        from astrobridge.connectors import CatalogConnector
+        from astrobridge.models import Source, Coordinate, Uncertainty, Photometry, Provenance
+
+        class CoordinateConnector(CatalogConnector):
+            def __init__(self):
+                self.cone_calls = 0
+
+            def query(self, name: str):
+                return None
+
+            async def cone_search(self, coordinate: Coordinate, radius_arcsec: float):
+                self.cone_calls += 1
+                return [
+                    Source(
+                        id="coord-1",
+                        name="Coordinate Match",
+                        coordinate=Coordinate(ra=coordinate.ra, dec=coordinate.dec),
+                        uncertainty=Uncertainty(ra_error=0.2, dec_error=0.2),
+                        photometry=[Photometry(magnitude=12.0, band="V")],
+                        provenance=Provenance(
+                            catalog_name="COORD",
+                            catalog_version="test",
+                            query_timestamp=datetime.utcnow(),
+                            source_id="coord-1",
+                        ),
+                    )
+                ]
+
+        connector = CoordinateConnector()
+        orchestrator = AstroBridgeOrchestrator(connectors={"coord": connector})
+        request = QueryRequest(
+            query_type="coordinates",
+            coordinates={"ra": 180.0, "dec": 45.0, "radius_arcsec": 30.0},
+            catalogs=["coord"],
+            auto_route=False,
+        )
+
+        response = await orchestrator.execute_query(request)
+        assert connector.cone_calls == 1
+        assert len(response.sources) == 1
 
     async def test_execute_query_applies_matcher_options(self):
         """Test orchestrator applies matcher controls from request."""

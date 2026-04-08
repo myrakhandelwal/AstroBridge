@@ -2,6 +2,7 @@
 import numpy as np
 from typing import List, Tuple
 from astrobridge.models import Source
+from astrobridge.geometry import angular_distance_deg
 
 
 class SpatialIndex:
@@ -92,4 +93,4 @@ class SpatialIndex:
     @staticmethod
     def _angular_distance(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
         """Compute angular distance in degrees (naive, not Haversine)."""
-        return np.sqrt((ra1 - ra2)**2 + (dec1 - dec2)**2)
+        return angular_distance_deg(ra1, dec1, ra2, dec2)

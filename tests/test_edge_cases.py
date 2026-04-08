@@ -204,7 +204,7 @@ class TestOrchestratorEdgeCases:
         orchestrator = AstroBridgeOrchestrator()
         orchestrator.add_connector("EMPTY", EmptyConnector())
 
-        request = QueryRequest(query_type="name", query="NonExistentObject")
+        request = QueryRequest(query_type="name", name="NonExistentObject")
         response = await orchestrator.execute_query(request)
 
         assert response is not None
@@ -244,8 +244,7 @@ class TestOrchestratorEdgeCases:
 
         request = QueryRequest(
             query_type="name",
-            query="Test",
-            search_radius_arcsec=3600.0  # 1 degree
+            name="Test",
         )
         response = await orchestrator.execute_query(request)
         assert response is not None

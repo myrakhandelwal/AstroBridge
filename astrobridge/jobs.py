@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
-from pathlib import Path
 import sqlite3
 import threading
 import uuid
@@ -13,6 +11,7 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
+from astrobridge.state_store import resolve_state_db_path, connect_sqlite
 
 
 class JobRecord(BaseModel):
@@ -36,10 +35,7 @@ class JobManager:
         self._lock = threading.Lock()
 
         if self.persist:
-            default_path = Path(".astrobridge/state.db")
-            resolved = Path(db_path or os.getenv("ASTROBRIDGE_STATE_DB", str(default_path)))
-            resolved.parent.mkdir(parents=True, exist_ok=True)
-            self._db_path = resolved
+            self._db_path = resolve_state_db_path(db_path)
             self._init_db()
         else:
             self._db_path = None
@@ -47,7 +43,7 @@ class JobManager:
     def _connect(self) -> sqlite3.Connection:
         if self._db_path is None:
             raise RuntimeError("Persistence is disabled")
-        return sqlite3.connect(str(self._db_path), check_same_thread=False)
+        return connect_sqlite(self._db_path)
 
     def _init_db(self) -> None:
         with self._connect() as conn:

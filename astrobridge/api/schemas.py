@@ -1,6 +1,6 @@
 """Data schemas for API requests and responses."""
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import List, Optional, Dict, Any, Literal
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import datetime
 
 
@@ -18,7 +18,7 @@ class CoordinateRequest(BaseModel):
 
 class QueryRequest(BaseModel):
     """Complete query request for multi-catalog source search."""
-    query_type: str = Field(
+    query_type: Literal["name", "coordinates", "natural_language"] = Field(
         ..., 
         description="Type of query: 'name', 'coordinates', or 'natural_language'"
     )
@@ -50,10 +50,21 @@ class QueryRequest(BaseModel):
         le=1.0,
         description="Optional photometric confidence weighting factor",
     )
-    weighting_profile: Optional[str] = Field(
+    weighting_profile: Optional[Literal["balanced", "position_first", "photometry_first"]] = Field(
         None,
         description="Optional weighting profile: balanced, position_first, or photometry_first",
     )
+
+    @model_validator(mode="after")
+    def _validate_query_payload(self) -> "QueryRequest":
+        """Enforce required payload fields for each query type."""
+        if self.query_type == "name" and not self.name:
+            raise ValueError("name is required when query_type='name'")
+        if self.query_type == "coordinates" and self.coordinates is None:
+            raise ValueError("coordinates are required when query_type='coordinates'")
+        if self.query_type == "natural_language" and not self.description:
+            raise ValueError("description is required when query_type='natural_language'")
+        return self
 
 
 class SourceResponse(BaseModel):

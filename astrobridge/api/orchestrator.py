@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from .schemas import QueryRequest, QueryResponse, SourceResponse, MatchResponse
 from astrobridge.matching.confidence import ConfidenceScorer
+from astrobridge.models import Coordinate, Source
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +70,12 @@ class AstroBridgeOrchestrator:
             errors = []
             
             query_tasks = []
+            task_catalogs = []
             for catalog in catalogs_to_query:
                 if catalog in self.connectors:
                     task = self._query_catalog(query_id, catalog, request)
                     query_tasks.append(task)
+                    task_catalogs.append(catalog)
                 else:
                     error_msg = f"Catalog {catalog} not available"
                     errors.append(error_msg)
@@ -81,23 +84,28 @@ class AstroBridgeOrchestrator:
             # Execute all queries concurrently
             results = await asyncio.gather(*query_tasks, return_exceptions=True)
             
-            for catalog, result in zip(catalogs_to_query, results):
+            for catalog, result in zip(task_catalogs, results):
                 if isinstance(result, Exception):
                     errors.append(f"{catalog}: {str(result)}")
                     logger.error(f"Query {query_id}: {catalog} query failed: {result}")
                 else:
                     sources_by_catalog[catalog] = result
             
-            # Flatten all sources
+            # Flatten all sources and convert to API response models.
             all_sources = []
+            source_responses = []
             for catalog, sources in sources_by_catalog.items():
                 all_sources.extend(sources)
+                source_responses.extend(
+                    self._source_to_response(source, catalog)
+                    for source in sources
+                )
             
             # Cross-match sources
             matches = []
             if self.matcher and len(all_sources) > 1:
                 try:
-                    matches = self._cross_match_sources(all_sources)
+                    matches = self._cross_match_sources(sources_by_catalog)
                     logger.debug(f"Query {query_id}: Found {len(matches)} matches")
                 except Exception as e:
                     logger.error(f"Query {query_id}: Cross-matching failed: {e}")
@@ -113,7 +121,7 @@ class AstroBridgeOrchestrator:
                 status=status,
                 query_type=request.query_type,
                 catalogs_queried=list(sources_by_catalog.keys()),
-                sources=all_sources,
+                sources=source_responses,
                 matches=matches,
                 routing_reasoning=routing_reasoning,
                 execution_time_ms=execution_time_ms,
@@ -199,7 +207,7 @@ class AstroBridgeOrchestrator:
         query_id: str,
         catalog: str,
         request: QueryRequest
-    ) -> List[SourceResponse]:
+    ) -> List[Source]:
         """
         Query a single catalog.
         
@@ -221,13 +229,19 @@ class AstroBridgeOrchestrator:
             lookup_value = request.name or request.description or ""
 
             if request.query_type in {"name", "natural_language"} and lookup_value:
-                result = connector.query(lookup_value)
-                if result:
-                    sources.append(self._source_to_response(result, catalog))
+                results = await connector.query_object(lookup_value)
+                sources.extend(results)
             
             elif request.query_type == "coordinates" and request.coordinates:
-                # Note: This requires cone_search method not yet implemented
-                logger.info(f"Query {query_id}: Coordinate search for {catalog} skipped (not implemented)")
+                center = Coordinate(
+                    ra=request.coordinates.ra,
+                    dec=request.coordinates.dec,
+                )
+                results = await connector.cone_search(
+                    center,
+                    request.coordinates.radius_arcsec,
+                )
+                sources.extend(results)
             
             logger.debug(f"Query {query_id}: {catalog} returned {len(sources)} sources")
             
@@ -237,56 +251,64 @@ class AstroBridgeOrchestrator:
         
         return sources
     
-    def _source_to_response(self, source: Any, catalog: str) -> SourceResponse:
+    def _source_to_response(self, source: Source, catalog: str) -> SourceResponse:
         """Convert a Source model to SourceResponse."""
-        from astrobridge.models import Source
-        
-        if isinstance(source, Source):
-            return SourceResponse(
-                id=source.id,
-                name=source.name,
-                ra=source.coordinate.ra,
-                dec=source.coordinate.dec,
-                catalog=catalog,
-                object_type=None,  # Would come from source metadata
-                magnitude=source.photometry[0].magnitude if source.photometry else None
-            )
-        
-        raise ValueError(f"Unsupported source type: {type(source)}")
+        return SourceResponse(
+            id=source.id,
+            name=source.name,
+            ra=source.coordinate.ra,
+            dec=source.coordinate.dec,
+            catalog=catalog,
+            object_type=None,
+            magnitude=source.photometry[0].magnitude if source.photometry else None,
+        )
     
-    def _cross_match_sources(self, sources: List[SourceResponse]) -> List[MatchResponse]:
+    def _cross_match_sources(self, sources_by_catalog: Dict[str, List[Source]]) -> List[MatchResponse]:
         """
         Cross-match sources from different catalogs.
         
         Args:
-            sources: List of sources from different catalogs
+            sources_by_catalog: Sources grouped by catalog name
             
         Returns:
             List of matched sources
         """
-        if not self.matcher or len(sources) < 2:
+        if not self.matcher or len(sources_by_catalog) < 2:
             return []
-        
-        # Group by catalog
-        by_catalog = {}
-        for source in sources:
-            if source.catalog not in by_catalog:
-                by_catalog[source.catalog] = []
-            by_catalog[source.catalog].append(source)
-        
-        # Match between catalogs (simple approach: pairwise)
+
+        # Build lookup tables once so match result conversion is deterministic.
+        response_lookup = {
+            catalog: {
+                source.id: self._source_to_response(source, catalog)
+                for source in sources
+            }
+            for catalog, sources in sources_by_catalog.items()
+        }
+
         matches = []
-        catalogs = list(by_catalog.keys())
-        
+        catalogs = list(sources_by_catalog.keys())
+
         for i, cat1 in enumerate(catalogs):
-            for cat2 in catalogs[i+1:]:
-                sources1 = by_catalog[cat1]
-                sources2 = by_catalog[cat2]
-                
-                # In production, would use actual matching algorithm
-                # For now, return empty matches
-                pass
-        
+            for cat2 in catalogs[i + 1:]:
+                raw_matches = self.matcher.match(
+                    sources_by_catalog[cat1],
+                    sources_by_catalog[cat2],
+                )
+                for raw_match in raw_matches:
+                    source1 = response_lookup[cat1].get(raw_match.source1_id)
+                    source2 = response_lookup[cat2].get(raw_match.source2_id)
+                    if source1 is None or source2 is None:
+                        continue
+                    matches.append(
+                        MatchResponse(
+                            source1=source1,
+                            source2=source2,
+                            match_probability=raw_match.match_probability,
+                            separation_arcsec=raw_match.separation_arcsec,
+                            confidence=raw_match.confidence,
+                        )
+                    )
+
         return matches
     
     def add_connector(self, catalog: str, connector: Any) -> None:

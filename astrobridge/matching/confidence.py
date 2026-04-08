@@ -1,5 +1,6 @@
 """Confidence scoring for astronomical source matches."""
 import logging
+import numpy as np
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict
 from astrobridge.models import Source
@@ -215,11 +216,9 @@ class ConfidenceScorer:
         
         mean_mag_diff = sum(mag_diffs) / len(mag_diffs)
         
-        # Score: sources should match in magnitude to within ~0.3 mag
-        # At diff = 0, score = 1
-        # At diff = 0.3, score ≈ 0.6
-        # At diff = 1.0, score ≈ 0.05
-        photometric_score = max(0.0, 1.0 - (mean_mag_diff / 0.3) ** 2)
+        # Keep scoring consistent with BayesianMatcher photometric likelihood.
+        tolerance = 0.5
+        photometric_score = float(np.exp(-(mean_mag_diff ** 2) / (2 * tolerance ** 2)))
         
         return photometric_score
     

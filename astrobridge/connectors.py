@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any, List, Optional
 from abc import ABC, abstractmethod
 from .models import Coordinate, Photometry, Provenance, Source, Uncertainty
+from .geometry import angular_distance_arcsec
 
 
 logger = logging.getLogger(__name__)
@@ -56,9 +57,12 @@ class CatalogConnector(ABC):
         Returns:
             Angular separation in arcseconds.
         """
-        d_ra = coord1.ra - coord2.ra
-        d_dec = coord1.dec - coord2.dec
-        return ((d_ra * d_ra + d_dec * d_dec) ** 0.5) * 3600.0
+        return angular_distance_arcsec(
+            coord1.ra,
+            coord1.dec,
+            coord2.ra,
+            coord2.dec,
+        )
 
 
 def _build_source(
