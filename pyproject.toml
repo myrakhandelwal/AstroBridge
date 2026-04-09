@@ -51,9 +51,10 @@ web = [
 astrobridge-demo = "demo:main"
 astrobridge-identify = "astrobridge.identify:main"
 astrobridge-web = "astrobridge.web.app:main"
+astrobridge-interactive = "interactive_demo:main"
 
 [tool.setuptools]
-py-modules = ["demo"]
+py-modules = ["demo", "interactive_demo"]
 include-package-data = true
 
 [tool.setuptools.packages.find]
