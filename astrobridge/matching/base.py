@@ -2,6 +2,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from astrobridge.models import MatchResult
+
 
 class MatcherError(Exception):
     """Exception raised for matcher-related errors."""
@@ -12,7 +14,7 @@ class Matcher(ABC):
     """Abstract base class for astronomical source matchers."""
     
     @abstractmethod
-    def match(self, sources1: list[Any], sources2: list[Any]) -> dict[str, Any]:
+    def match(self, sources1: list[Any], sources2: list[Any]) -> list[MatchResult]:
         """
         Match sources from two lists.
         
@@ -21,6 +23,6 @@ class Matcher(ABC):
             sources2: Second list of sources
             
         Returns:
-            Dictionary containing match results
+            List of match results
         """
-        pass
+        raise NotImplementedError

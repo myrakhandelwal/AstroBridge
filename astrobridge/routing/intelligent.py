@@ -170,7 +170,7 @@ class NLPQueryRouter(QueryRouter):
         "supernova", "sne", "sn ", "transient", "explosion", "transients"
     ]
     
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize NLP router."""
         logger.info("Initialized NLPQueryRouter")
         self.ranker = CatalogRanker()

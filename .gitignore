@@ -11,6 +11,10 @@ venv/
 *.egg-info/
 build/
 dist/
+astrobridge/_version.py
+
+# Test/runtime artifacts
+tests/tmp_web_state.db
 
 # OS/editor files
 .DS_Store

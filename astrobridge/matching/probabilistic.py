@@ -65,7 +65,7 @@ class BayesianMatcher(Matcher):
             return []
         
         # Build spatial index on candidates for non-proper-motion matching.
-        spatial_index = None
+        spatial_index: Optional[SpatialIndex] = None
         if not self.proper_motion_aware:
             spatial_index = SpatialIndex(candidate_sources)
         
@@ -86,6 +86,7 @@ class BayesianMatcher(Matcher):
                     if sep_arcsec <= search_radius_arcsec:
                         nearby_indices.append(idx)
             else:
+                assert spatial_index is not None
                 nearby_indices = spatial_index.query_radius(
                     ref_source.coordinate.ra,
                     ref_source.coordinate.dec,
@@ -213,8 +214,8 @@ class BayesianMatcher(Matcher):
     
     def set_thresholds(
         self, 
-        confidence_threshold: float = None, 
-        positional_sigma_threshold: float = None
+        confidence_threshold: Optional[float] = None, 
+        positional_sigma_threshold: Optional[float] = None
     ) -> None:
         """Set matching thresholds."""
         if confidence_threshold is not None:
@@ -276,7 +277,7 @@ class BayesianMatcher(Matcher):
         sigma = combined_error_arcsec
         likelihood = np.exp(-(distance_arcsec**2) / (2 * sigma**2))
         
-        return likelihood
+        return float(likelihood)
     
     def _photometric_likelihood(self, source_ref: Source, source_cand: Source) -> float:
         """Compute photometric likelihood."""
@@ -302,7 +303,7 @@ class BayesianMatcher(Matcher):
         tolerance = 0.5
         likelihood = np.exp(-(mean_diff**2) / (2 * tolerance**2))
         
-        return likelihood
+        return float(likelihood)
     
     def _positional_significance(self, source_ref: Source, source_cand: Source) -> float:
         """Compute positional significance in sigma."""
@@ -347,7 +348,7 @@ class BayesianMatcher(Matcher):
         # Convert to consistency score (1 = perfect, 0 = very different)
         consistency = np.exp(-rms_diff**2 / (2 * 0.5**2))
         
-        return consistency
+        return float(consistency)
     
     @staticmethod
     def _angular_distance(ra1: float, dec1: float, ra2: float, dec2: float) -> float:

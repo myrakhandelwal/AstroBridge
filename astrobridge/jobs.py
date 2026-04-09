@@ -9,6 +9,7 @@ import sqlite3
 import threading
 import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -36,14 +37,13 @@ class JobManager:
     def __init__(self, db_path: Optional[str] = None, persist: bool = True) -> None:
         self.persist = persist
         self._jobs: dict[str, JobRecord] = {}
-        self._tasks: set[asyncio.Task] = set()  # Track active tasks
+        self._tasks: set[asyncio.Task[None]] = set()  # Track active tasks
+        self._db_path: Optional[Path] = None
         self._lock = threading.Lock()
 
         if self.persist:
             self._db_path = resolve_state_db_path(db_path)
             self._init_db()
-        else:
-            self._db_path = None
 
     def _connect(self) -> sqlite3.Connection:
         if self._db_path is None:
@@ -68,7 +68,7 @@ class JobManager:
             conn.commit()
 
     @staticmethod
-    def _record_to_tuple(record: JobRecord) -> tuple:
+    def _record_to_tuple(record: JobRecord) -> tuple[str, str, str, Optional[str], Optional[str], Optional[str], Optional[str]]:
         return (
             record.job_id,
             record.status,
@@ -132,7 +132,7 @@ class JobManager:
         self._tasks.add(task)
         
         # Add callback to handle task completion and cleanup
-        def _task_done_callback(t: asyncio.Task) -> None:
+        def _task_done_callback(t: asyncio.Task[None]) -> None:
             self._tasks.discard(t)
             if t.cancelled():
                 logger.info("Query job %s was cancelled", job_id)

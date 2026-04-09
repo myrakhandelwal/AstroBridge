@@ -125,7 +125,7 @@ class ConfidenceScorer:
             distance_ratio = min(distance_ratio, 1.5)
         
         # Weighted combination with adaptive weights when photometry is unavailable.
-        if has_photometric_signal:
+        if has_photometric_signal and photometric_score is not None:
             combined_score = (
                 self.astrometric_weight * astrometric_score +
                 self.photometric_weight * photometric_score
@@ -184,7 +184,7 @@ class ConfidenceScorer:
         ratio = separation_arcsec / (effective_scale_arcsec + 1e-6)
         astrometric_score = max(0.0, 1.0 - ratio ** 1.25)
         
-        return astrometric_score
+        return float(astrometric_score)
     
     def _score_photometric(self, source1: Source, source2: Source) -> Optional[float]:
         """

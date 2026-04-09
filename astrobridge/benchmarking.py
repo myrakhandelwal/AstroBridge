@@ -29,13 +29,42 @@ class BenchmarkRunner:
         statuses: list[str] = []
 
         workload = [
-            QueryRequest(query_type="name", name="Proxima Centauri", auto_route=True),
+            QueryRequest(
+                query_type="name",
+                name="Proxima Centauri",
+                coordinates=None,
+                description=None,
+                catalogs=None,
+                auto_route=True,
+                match_epoch=None,
+                astrometric_weight=None,
+                photometric_weight=None,
+                weighting_profile=None,
+            ),
             QueryRequest(
                 query_type="natural_language",
+                name=None,
+                coordinates=None,
                 description="Find nearby red dwarf stars",
+                catalogs=None,
                 auto_route=True,
+                match_epoch=None,
+                astrometric_weight=None,
+                photometric_weight=None,
+                weighting_profile=None,
             ),
-            QueryRequest(query_type="name", name="M31", auto_route=True),
+            QueryRequest(
+                query_type="name",
+                name="M31",
+                coordinates=None,
+                description=None,
+                catalogs=None,
+                auto_route=True,
+                match_epoch=None,
+                astrometric_weight=None,
+                photometric_weight=None,
+                weighting_profile=None,
+            ),
         ]
 
         for i in range(config.iterations):

@@ -282,7 +282,7 @@ class TestQueryExecution:
         assert response.query_id is not None
         assert response.execution_time_ms > 0
 
-    def test_query_request_requires_payload_per_query_type(self):
+    async def test_query_request_requires_payload_per_query_type(self):
         """QueryRequest should validate required payload by query type."""
         with pytest.raises(ValueError, match="name is required"):
             QueryRequest(query_type="name")
@@ -293,7 +293,7 @@ class TestQueryExecution:
         with pytest.raises(ValueError, match="description is required"):
             QueryRequest(query_type="natural_language")
 
-    def test_query_request_rejects_unknown_query_type(self):
+    async def test_query_request_rejects_unknown_query_type(self):
         """QueryRequest should reject unknown query types."""
         with pytest.raises(ValueError):
             QueryRequest(query_type="unknown", name="x")

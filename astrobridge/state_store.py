@@ -11,7 +11,8 @@ from typing import Optional
 def resolve_state_db_path(db_path: Optional[str] = None) -> Path:
     """Resolve state DB path from explicit value or environment default."""
     default_path = Path(".astrobridge/state.db")
-    resolved = Path(db_path or os.getenv("ASTROBRIDGE_STATE_DB", str(default_path)))
+    selected = db_path if db_path is not None else os.getenv("ASTROBRIDGE_STATE_DB")
+    resolved = Path(selected) if selected is not None else default_path
     resolved.parent.mkdir(parents=True, exist_ok=True)
     return resolved
 

@@ -134,9 +134,14 @@ def _build_source(
     return Source(
         id=source_id,
         name=name,
-        coordinate=Coordinate(ra=ra, dec=dec),
+        coordinate=Coordinate(
+            ra=ra,
+            dec=dec,
+            pm_ra_mas_per_year=None,
+            pm_dec_mas_per_year=None,
+        ),
         uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
-        photometry=[Photometry(magnitude=magnitude, band="V")],
+        photometry=[Photometry(magnitude=magnitude, band="V", magnitude_error=None)],
         provenance=Provenance(
             catalog_name=catalog_name,
             catalog_version=catalog_version,
@@ -149,7 +154,7 @@ def _build_source(
 class SimbadConnector(CatalogConnector):
     """SIMBAD catalog connector."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._sources = [
             _build_source(
                 source_id="SIMBAD:PROXCEN",
@@ -217,7 +222,7 @@ class SimbadConnector(CatalogConnector):
 class NEDConnector(CatalogConnector):
     """NASA Extragalactic Database connector."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._sources = [
             _build_source(
                 source_id="NED:PROXCEN-REF",
@@ -314,19 +319,20 @@ class SimbadTapAdapter(CatalogConnector):
         self.max_retries = max_retries
         self.retry_delay_sec = retry_delay_sec
         self._request_semaphore = asyncio.Semaphore(max(1, max_concurrency))
+        self._service: TapServiceProtocol
 
         if tap_service is not None:
             self._service = tap_service
             return
 
         try:
-            import pyvo as _pyvo
+            import pyvo as _pyvo  # type: ignore[import-untyped]
         except ImportError as exc:
             raise RuntimeError(
                 "SimbadTapAdapter requires pyvo. Install with `pip install -e .[live]`."
             ) from exc
 
-        self._service: TapServiceProtocol = _pyvo.dal.TAPService(self.tap_url)
+        self._service = _pyvo.dal.TAPService(self.tap_url)
 
     def query(self, name: str) -> Optional[Source]:
         """Query SIMBAD TAP by object identifier."""
@@ -482,14 +488,19 @@ class SimbadTapAdapter(CatalogConnector):
         photometry = []
         if flux_v is not None:
             try:
-                photometry = [Photometry(magnitude=float(flux_v), band="V")]
+                photometry = [Photometry(magnitude=float(flux_v), band="V", magnitude_error=None)]
             except (TypeError, ValueError):
                 photometry = []
 
         return Source(
             id=f"SIMBAD_TAP:{main_id}",
             name=main_id,
-            coordinate=Coordinate(ra=ra, dec=dec),
+            coordinate=Coordinate(
+                ra=ra,
+                dec=dec,
+                pm_ra_mas_per_year=None,
+                pm_dec_mas_per_year=None,
+            ),
             uncertainty=Uncertainty(ra_error=err_maj, dec_error=err_min),
             photometry=photometry,
             provenance=Provenance(
@@ -533,6 +544,7 @@ class NedTapAdapter(CatalogConnector):
         self.max_retries = max_retries
         self.retry_delay_sec = retry_delay_sec
         self._request_semaphore = asyncio.Semaphore(max(1, max_concurrency))
+        self._service: TapServiceProtocol
 
         if tap_service is not None:
             self._service = tap_service
@@ -545,7 +557,7 @@ class NedTapAdapter(CatalogConnector):
                 "NedTapAdapter requires pyvo. Install with `pip install -e .[live]`."
             ) from exc
 
-        self._service: TapServiceProtocol = _pyvo.dal.TAPService(self.tap_url)
+        self._service = _pyvo.dal.TAPService(self.tap_url)
 
     def query(self, name: str) -> Optional[Source]:
         """Query NED TAP by object identifier."""
@@ -695,7 +707,12 @@ class NedTapAdapter(CatalogConnector):
         return Source(
             id=f"NED_TAP:{main_id}",
             name=main_id,
-            coordinate=Coordinate(ra=ra, dec=dec),
+            coordinate=Coordinate(
+                ra=ra,
+                dec=dec,
+                pm_ra_mas_per_year=None,
+                pm_dec_mas_per_year=None,
+            ),
             uncertainty=Uncertainty(ra_error=err_maj, dec_error=err_min),
             photometry=[],
             provenance=Provenance(

@@ -7,6 +7,7 @@ import sqlite3
 import threading
 from collections import Counter
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -33,13 +34,12 @@ class AnalyticsStore:
     def __init__(self, db_path: Optional[str] = None, persist: bool = True) -> None:
         self.persist = persist
         self._events: list[AnalyticsEvent] = []
+        self._db_path: Optional[Path] = None
         self._lock = threading.Lock()
 
         if self.persist:
             self._db_path = resolve_state_db_path(db_path)
             self._init_db()
-        else:
-            self._db_path = None
 
     def _connect(self) -> sqlite3.Connection:
         if self._db_path is None:

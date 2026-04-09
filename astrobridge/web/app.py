@@ -2,6 +2,7 @@
 
 import os
 from datetime import datetime
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 from astrobridge.analytics import AnalyticsEvent, AnalyticsStore
 from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
 from astrobridge.benchmarking import BenchmarkConfig, BenchmarkRunner
+from astrobridge.connectors import CatalogConnector
 from astrobridge.identify import identify_object
 from astrobridge.jobs import JobManager
 from astrobridge.matching import BayesianMatcher
@@ -30,13 +32,13 @@ class BenchmarkRequest(BaseModel):
     iterations: int = Field(default=20, ge=1, le=10000)
 
 
-class WebDemoConnector:
+class WebDemoConnector(CatalogConnector):
     """Deterministic connector for browser demo queries."""
 
-    def __init__(self, catalog_name: str):
+    def __init__(self, catalog_name: str) -> None:
         self.catalog_name = catalog_name
 
-    def query(self, name: str):
+    def query(self, name: str) -> Optional[Source]:
         offsets = {
             "simbad": 0.0000,
             "gaia": 0.0005,
@@ -53,9 +55,14 @@ class WebDemoConnector:
         return Source(
             id=f"{self.catalog_name}:{label.lower().replace(' ', '_')}",
             name=label,
-            coordinate=Coordinate(ra=217.429 + offset, dec=-62.680 + offset),
+          coordinate=Coordinate(
+            ra=217.429 + offset,
+            dec=-62.680 + offset,
+            pm_ra_mas_per_year=None,
+            pm_dec_mas_per_year=None,
+          ),
             uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
-            photometry=[Photometry(magnitude=11.05 + offset, band="V")],
+          photometry=[Photometry(magnitude=11.05 + offset, band="V", magnitude_error=None)],
             provenance=Provenance(
                 catalog_name=self.catalog_name.upper(),
                 catalog_version="web-demo",
@@ -386,7 +393,7 @@ async def index() -> HTMLResponse:
 
 
 @app.post("/api/query")
-async def run_query(request: QueryRequest):
+async def run_query(request: QueryRequest) -> Any:
   started = datetime.utcnow()
   response = await orchestrator.execute_query(request)
   elapsed_ms = (datetime.utcnow() - started).total_seconds() * 1000
@@ -394,6 +401,7 @@ async def run_query(request: QueryRequest):
     AnalyticsEvent(
       event_type="query_executed",
       query_type=request.query_type,
+      user_level=None,
       success=(response.status != "error"),
       latency_ms=elapsed_ms,
       catalog_count=len(response.catalogs_queried),
@@ -403,7 +411,7 @@ async def run_query(request: QueryRequest):
 
 
 @app.post("/api/identify")
-async def run_identify(request: IdentifyRequest):
+async def run_identify(request: IdentifyRequest) -> dict[str, Any]:
   try:
     result = identify_object(request.input_text)
   except ValueError as exc:
@@ -413,7 +421,10 @@ async def run_identify(request: IdentifyRequest):
     AnalyticsEvent(
       event_type="identify_executed",
       query_type="identify",
+      user_level=None,
       success=True,
+      latency_ms=None,
+      catalog_count=None,
     )
   )
 
@@ -429,16 +440,23 @@ async def run_identify(request: IdentifyRequest):
 
 
 @app.post("/api/jobs")
-async def submit_job(request: QueryRequest):
+async def submit_job(request: QueryRequest) -> dict[str, str]:
   job_id = await job_manager.submit_query(request, orchestrator)
   analytics_store.record(
-    AnalyticsEvent(event_type="job_submitted", query_type=request.query_type, success=True)
+    AnalyticsEvent(
+      event_type="job_submitted",
+      query_type=request.query_type,
+      user_level=None,
+      success=True,
+      latency_ms=None,
+      catalog_count=None,
+    )
   )
   return {"job_id": job_id, "status": "queued"}
 
 
 @app.get("/api/jobs/{job_id}")
-async def job_status(job_id: str):
+async def job_status(job_id: str) -> dict[str, Any]:
   job = job_manager.get_job(job_id)
   if job is None:
     raise HTTPException(status_code=404, detail="Job not found")
@@ -446,7 +464,7 @@ async def job_status(job_id: str):
 
 
 @app.get("/api/jobs/{job_id}/result")
-async def job_result(job_id: str):
+async def job_result(job_id: str) -> dict[str, Any]:
   job = job_manager.get_job(job_id)
   if job is None:
     raise HTTPException(status_code=404, detail="Job not found")
@@ -458,25 +476,28 @@ async def job_result(job_id: str):
 
 
 @app.post("/api/analytics/event")
-async def record_analytics_event(event: AnalyticsEvent):
+async def record_analytics_event(event: AnalyticsEvent) -> dict[str, Any]:
   stored = analytics_store.record(event)
   return {"status": "recorded", "event": stored.model_dump()}
 
 
 @app.get("/api/analytics/summary")
-async def analytics_summary():
+async def analytics_summary() -> dict[str, Any]:
   return analytics_store.summary()
 
 
 @app.post("/api/benchmark/run")
-async def run_benchmark(request: BenchmarkRequest):
+async def run_benchmark(request: BenchmarkRequest) -> dict[str, Any]:
   runner = BenchmarkRunner(orchestrator)
   result = await runner.run(BenchmarkConfig(iterations=request.iterations))
   analytics_store.record(
     AnalyticsEvent(
       event_type="benchmark_executed",
       query_type="benchmark",
+      user_level=None,
       success=True,
+      latency_ms=None,
+      catalog_count=None,
       metadata={"iterations": request.iterations},
     )
   )

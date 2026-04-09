@@ -11,7 +11,7 @@ from typing import Optional, Protocol
 
 from astrobridge.connectors import CatalogConnector
 from astrobridge.matching.confidence import ConfidenceScorer
-from astrobridge.models import Coordinate, Source
+from astrobridge.models import Coordinate, MatchResult, Source
 from astrobridge.routing.base import QueryRouter
 
 from .schemas import MatchResponse, QueryRequest, QueryResponse, SourceResponse
@@ -37,7 +37,7 @@ class _MatcherLike(Protocol):
     match_epoch: Optional[datetime]
     confidence_scorer: ConfidenceScorer
 
-    def match(self, sources1: list[Source], sources2: list[Source]) -> list[_MatchResultLike]:
+    def match(self, sources1: list[Source], sources2: list[Source]) -> list[MatchResult]:
         ...
 
 
@@ -86,7 +86,10 @@ class AstroBridgeOrchestrator:
                 routing_decision = self.router.parse_query(
                     request.description or request.name or ""
                 )
-                catalogs_to_query = [str(catalog) for catalog in routing_decision.get_top_catalogs(n=3)]
+                catalogs_to_query = [
+                    str(getattr(catalog, "value", catalog))
+                    for catalog in routing_decision.get_top_catalogs(n=3)
+                ]
                 routing_reasoning = routing_decision.reasoning
                 logger.debug(f"Query {query_id}: Routed to {catalogs_to_query}")
             else:
@@ -114,7 +117,7 @@ class AstroBridgeOrchestrator:
             results = await asyncio.gather(*query_tasks, return_exceptions=True)
             
             for catalog, result in zip(task_catalogs, results):
-                if isinstance(result, Exception):
+                if isinstance(result, BaseException):
                     errors.append(f"{catalog}: {str(result)}")
                     logger.error(f"Query {query_id}: {catalog} query failed: {result}")
                 else:
@@ -174,6 +177,7 @@ class AstroBridgeOrchestrator:
                 catalogs_queried=[],
                 sources=[],
                 matches=[],
+                routing_reasoning=None,
                 execution_time_ms=execution_time_ms,
                 errors=[str(e)]
             )
@@ -208,11 +212,11 @@ class AstroBridgeOrchestrator:
             )
             astrometric_weight = profiled.astrometric_weight
             photometric_weight = profiled.photometric_weight
-            weighting_profile = request.weighting_profile
+            weighting_profile: str = request.weighting_profile
         else:
             astrometric_weight = existing.astrometric_weight
             photometric_weight = existing.photometric_weight
-            weighting_profile = getattr(existing, "weighting_profile", "balanced")
+            weighting_profile = str(getattr(existing, "weighting_profile", "balanced"))
 
         # Explicit per-request weights override profile values when provided.
         if request.astrometric_weight is not None:
@@ -265,6 +269,8 @@ class AstroBridgeOrchestrator:
                 center = Coordinate(
                     ra=request.coordinates.ra,
                     dec=request.coordinates.dec,
+                    pm_ra_mas_per_year=None,
+                    pm_dec_mas_per_year=None,
                 )
                 results = await connector.cone_search(
                     center,

@@ -19,6 +19,7 @@ class SpatialIndex:
         """
         self.sources = sources
         self.partition_size = partition_size
+        self.grid: dict[tuple[int, int], list[int]] = {}
         self._build_index()
     
     def _build_index(self) -> None:
