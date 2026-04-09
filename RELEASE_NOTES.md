@@ -1,6 +1,51 @@
-# AstroBridge Release Notes v0.2.0
+# AstroBridge Release Notes
 
-## Release: April 8, 2026 — Comprehensive Documentation & Production Ready
+## Release: April 9, 2026 — v0.3.0 Modernization & Type Safety
+
+### 📦 Version Information
+- **Version**: 0.3.0 (up from 0.2.0)
+- **Status**: ✅ Production Ready + Modernized
+- **Tests**: 126 passing (100%)
+- **GitHub Tag**: `v0.3.0`
+
+### ✨ Major Updates
+
+#### 1. **Modern Python Packaging (PEP 621)**
+- Migrated from legacy `setup.py` to `pyproject.toml`
+- Uses setuptools with declarative metadata
+- Cleaner dependency management (dev, web, live extras)
+- Better tool integration (Ruff, mypy, pytest)
+
+#### 2. **Strict Type Safety**
+- `astrobridge.api.orchestrator`: Protocol-based typing for matchers and routers
+- `astrobridge.connectors`: `TapServiceProtocol`, typed connector interfaces
+- `astrobridge.jobs`: Explicit async task tracking types
+- `dict`/`list` annotations (Python 3.9 compatible, no `Dict`/`List`)
+- Mypy strict mode on core modules
+
+#### 3. **Async Concurrency Improvements**
+- Live TAP adapters now use bounded `asyncio.Semaphore(max_concurrency=8)`
+  - Prevents network request explosion under load
+  - `SimbadTapAdapter` and `NedTapAdapter` improvements
+  - Maintains timeout enforcement for reliability
+- Refactored I/O-bound execution via `_run_io_bound()` helper
+
+#### 4. **CI/Linting Pipeline**
+- New `.github/workflows/ci.yml` with full quality gates:
+  - Ruff linting (import sorting, type upgrades, style)
+  - Mypy strict type checking
+  - Full test suite (`pytest`)
+- 200+ code style violations auto-fixed
+
+#### 5. **Backward Compatibility**
+- ✅ All 126 tests pass
+- ✅ Demo runs end-to-end successfully
+- ✅ Full API compatibility maintained
+- Drop-in replacement for v0.2.0
+
+---
+
+## Previous Release: April 8, 2026 — v0.2.0 Comprehensive Documentation & Production Ready
 
 ### 📦 Version Information
 - **Version**: 0.2.0 (up from 0.1.1)

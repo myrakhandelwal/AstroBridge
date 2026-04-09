@@ -1,5 +1,30 @@
 # AstroBridge Release Notes
 
+## v0.3.0 (April 9, 2026) — Modernization & Type Safety
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                   AstroBridge Release v0.3.0                                 ║
+║                  Modernization & Type Safety Baseline                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📦 RELEASE INFO
+───────────────────────────────────────────────────────────────────────────────
+Date:           April 9, 2026
+Version:        0.3.0
+Status:         ✅ Production Ready + Modernized
+Tests:          126 passing (100%)
+Backwards Compat: ✅ Drop-in replacement for v0.2.0
+
+🔧 MODERNIZATION UPDATES (NEW in 0.3.0)
+───────────────────────────────────────────────────────────────────────────────
+✓ PEP 621 pyproject.toml (replaced setup.py)
+✓ Strict type hints (dict/list, Protocol-based interfaces)
+✓ Bounded async concurrency for TAP adapters
+✓ Ruff + mypy CI pipeline
+✓ Safer network request handling with semaphores
+
+---
+
 ## v0.2.0 (April 8, 2026) — Comprehensive Documentation & Production Ready
 
 
