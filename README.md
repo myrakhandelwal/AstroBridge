@@ -1,5 +1,9 @@
 # AstroBridge
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Status: Stable](https://img.shields.io/badge/status-stable-green.svg)](#)
+
 **Version: 0.3.0** — Modern Python Packaging, Strict Type Safety, Production-Ready
 
 AstroBridge is a compact astronomical source matching pipeline that combines three pieces:
