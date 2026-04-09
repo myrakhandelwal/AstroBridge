@@ -1,10 +1,15 @@
 [build-system]
-requires = ["setuptools>=69", "wheel"]
+requires = ["setuptools>=69", "setuptools_scm[toml]>=7", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "astrobridge/_version.py"
+write_to_template = "__version__ = '{version}'"
+fallback_version = "0.3.0"
 
 [project]
 name = "astrobridge"
-version = "0.3.0"
+dynamic = ["version"]
 description = "Astronomical source matching and cross-catalog orchestration"
 readme = "README.md"
 requires-python = ">=3.9"
