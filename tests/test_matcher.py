@@ -1,12 +1,11 @@
 """Unit tests for probabilistic matcher."""
-import pytest
-import numpy as np
 from datetime import datetime
+
+import pytest
+
 from astrobridge.matching import BayesianMatcher, MatcherConfig, ObjectType
 from astrobridge.matching.confidence import MatchScore
-from astrobridge.models import (
-    Source, Coordinate, Uncertainty, Photometry, Provenance
-)
+from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty
 
 
 @pytest.fixture

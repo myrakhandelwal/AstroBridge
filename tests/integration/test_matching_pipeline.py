@@ -1,11 +1,11 @@
 """Integration tests for full matching pipeline."""
-import pytest
 from datetime import datetime
-from astrobridge.connectors import SimbadConnector, NEDConnector
+
+import pytest
+
+from astrobridge.connectors import NEDConnector, SimbadConnector
 from astrobridge.matching import BayesianMatcher, MatcherConfig, ObjectType
-from astrobridge.models import (
-    Coordinate, Source, Uncertainty, Photometry, Provenance
-)
+from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty
 
 
 @pytest.mark.asyncio
@@ -150,8 +150,9 @@ class TestErrorHandling:
     def test_empty_candidates(self):
         """Test matching with empty candidate list."""
         matcher = BayesianMatcher()
-        from astrobridge.models import Source, Coordinate, Provenance
         from datetime import datetime
+
+        from astrobridge.models import Coordinate, Provenance, Source
         
         prov = Provenance(
             catalog_name="Test",

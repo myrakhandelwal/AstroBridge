@@ -1,6 +1,7 @@
 """Data models for astronomical sources."""
-from typing import List, Optional
 from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -45,7 +46,7 @@ class Source(BaseModel):
     name: str = Field(..., description="Source name")
     coordinate: Coordinate = Field(..., description="Position")
     uncertainty: Uncertainty = Field(..., description="Position uncertainty")
-    photometry: List[Photometry] = Field(default_factory=list, description="Photometric data")
+    photometry: list[Photometry] = Field(default_factory=list, description="Photometric data")
     provenance: Provenance = Field(..., description="Source provenance")
 
 

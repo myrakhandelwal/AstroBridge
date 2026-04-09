@@ -1,8 +1,9 @@
 """Calibration utilities for matcher tuning."""
 import logging
+
 import numpy as np
-from typing import List, Tuple, Dict, Any
-from astrobridge.models import Source, MatchResult
+
+from astrobridge.models import MatchResult
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +13,9 @@ class MatcherCalibrator:
     
     @staticmethod
     def evaluate_matches(
-        matches: List[MatchResult],
-        ground_truth_pairs: List[Tuple[str, str]]
-    ) -> Dict[str, float]:
+        matches: list[MatchResult],
+        ground_truth_pairs: list[tuple[str, str]]
+    ) -> dict[str, float]:
         """
         Evaluate matching results against ground truth.
         
@@ -61,8 +62,8 @@ class MatcherCalibrator:
     
     @staticmethod
     def compute_distance_distribution(
-        matches: List[MatchResult]
-    ) -> Dict[str, float]:
+        matches: list[MatchResult]
+    ) -> dict[str, float]:
         """
         Compute statistics on match separation distances.
         

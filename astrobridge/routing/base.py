@@ -1,8 +1,8 @@
 """Base classes for query routing."""
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional, Tuple
 from enum import Enum
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +36,12 @@ class ObjectClass(str, Enum):
     UNKNOWN = "unknown"
 
 
-class RoutingDecision(object):
+class RoutingDecision:
     """Represents a routing decision for a query."""
     
     def __init__(
         self,
-        catalog_priority: List[Tuple[CatalogType, float]],
+        catalog_priority: list[tuple[CatalogType, float]],
         object_class: ObjectClass,
         search_radius_arcsec: float,
         reasoning: str
@@ -60,7 +60,7 @@ class RoutingDecision(object):
         self.search_radius_arcsec = search_radius_arcsec
         self.reasoning = reasoning
     
-    def get_top_catalogs(self, n: int = 3) -> List[CatalogType]:
+    def get_top_catalogs(self, n: int = 3) -> list[CatalogType]:
         """Get top n catalogs by priority."""
         return [cat for cat, _ in self.catalog_priority[:n]]
     
@@ -105,8 +105,8 @@ class QueryRouter(ABC):
     def rank_catalogs(
         self,
         object_class: ObjectClass,
-        query_properties: Dict[str, Any]
-    ) -> List[Tuple[CatalogType, float]]:
+        query_properties: dict[str, Any]
+    ) -> list[tuple[CatalogType, float]]:
         """
         Rank catalogs by relevance for given object class and properties.
         

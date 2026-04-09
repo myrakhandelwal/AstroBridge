@@ -9,10 +9,11 @@ import sqlite3
 import threading
 import uuid
 from datetime import datetime
-from typing import Any, Dict, Optional, Set
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
-from astrobridge.state_store import resolve_state_db_path, connect_sqlite
+
+from astrobridge.state_store import connect_sqlite, resolve_state_db_path
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class JobRecord(BaseModel):
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     error: Optional[str] = None
-    result: Optional[Dict[str, Any]] = None
+    result: Optional[dict[str, Any]] = None
 
 
 class JobManager:
@@ -34,8 +35,8 @@ class JobManager:
 
     def __init__(self, db_path: Optional[str] = None, persist: bool = True) -> None:
         self.persist = persist
-        self._jobs: Dict[str, JobRecord] = {}
-        self._tasks: Set[asyncio.Task] = set()  # Track active tasks
+        self._jobs: dict[str, JobRecord] = {}
+        self._tasks: set[asyncio.Task] = set()  # Track active tasks
         self._lock = threading.Lock()
 
         if self.persist:
@@ -93,10 +94,9 @@ class JobManager:
     def _save_record(self, record: JobRecord) -> None:
         if not self.persist:
             return
-        with self._lock:
-            with self._connect() as conn:
-                conn.execute(
-                    """
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
                     INSERT INTO jobs (
                         job_id,
                         status,
@@ -113,9 +113,9 @@ class JobManager:
                         error=excluded.error,
                         result_json=excluded.result_json
                     """,
-                    self._record_to_tuple(record),
-                )
-                conn.commit()
+                self._record_to_tuple(record),
+            )
+            conn.commit()
 
     async def submit_query(self, request: Any, orchestrator: Any) -> str:
         job_id = str(uuid.uuid4())
@@ -172,17 +172,16 @@ class JobManager:
         if not self.persist:
             return None
 
-        with self._lock:
-            with self._connect() as conn:
-                conn.row_factory = sqlite3.Row
-                row = conn.execute(
-                    """
+        with self._lock, self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
                     SELECT job_id, status, created_at, started_at, finished_at, error, result_json
                     FROM jobs
                     WHERE job_id = ?
                     """,
-                    (job_id,),
-                ).fetchone()
+                (job_id,),
+            ).fetchone()
 
         if row is None:
             return None
@@ -190,7 +189,7 @@ class JobManager:
         self._jobs[job_id] = record
         return record
 
-    def get_result(self, job_id: str) -> Optional[Dict[str, Any]]:
+    def get_result(self, job_id: str) -> Optional[dict[str, Any]]:
         record = self._jobs.get(job_id)
         if record is None:
             return None

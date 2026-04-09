@@ -1,16 +1,14 @@
 """Intelligent query routing with NLP and catalog ranking."""
 import logging
 import re
-from typing import List, Dict, Any, Tuple, Optional
-from .base import (
-    QueryRouter, RouterError, RoutingDecision,
-    CatalogType, ObjectClass
-)
+from typing import Any, Optional
+
+from .base import CatalogType, ObjectClass, QueryRouter, RoutingDecision
 
 logger = logging.getLogger(__name__)
 
 
-class CatalogRanker(object):
+class CatalogRanker:
     """Ranks catalogs based on object type and query properties."""
     
     # Catalog strengths by object type
@@ -105,8 +103,8 @@ class CatalogRanker(object):
     @staticmethod
     def rank_for_class(
         object_class: ObjectClass,
-        query_properties: Optional[Dict[str, Any]] = None
-    ) -> List[Tuple[CatalogType, float]]:
+        query_properties: Optional[dict[str, Any]] = None
+    ) -> list[tuple[CatalogType, float]]:
         """
         Rank catalogs for given object class.
         
@@ -250,8 +248,8 @@ class NLPQueryRouter(QueryRouter):
     def rank_catalogs(
         self,
         object_class: ObjectClass,
-        query_properties: Dict[str, Any]
-    ) -> List[Tuple[CatalogType, float]]:
+        query_properties: dict[str, Any]
+    ) -> list[tuple[CatalogType, float]]:
         """
         Rank catalogs by relevance.
         
@@ -264,7 +262,7 @@ class NLPQueryRouter(QueryRouter):
         """
         return self.ranker.rank_for_class(object_class, query_properties)
     
-    def _extract_properties(self, query: str) -> Dict[str, Any]:
+    def _extract_properties(self, query: str) -> dict[str, Any]:
         """Extract query properties from natural language."""
         props = {}
         query_lower = query.lower()
@@ -302,7 +300,6 @@ class NLPQueryRouter(QueryRouter):
         query_lower = query.lower()
         
         # Look for explicit radius
-        import re
         radius_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:arcmin|arcminute|")', query_lower)
         if radius_match:
             arcmin = float(radius_match.group(1))
@@ -329,8 +326,8 @@ class NLPQueryRouter(QueryRouter):
     def _build_reasoning(
         self,
         object_class: ObjectClass,
-        query_props: Dict[str, Any],
-        catalog_priority: List[Tuple[CatalogType, float]]
+        query_props: dict[str, Any],
+        catalog_priority: list[tuple[CatalogType, float]]
     ) -> str:
         """Build human-readable explanation of routing decision."""
         top_catalogs = [f"{cat.value}({score:.2f})" for cat, score in catalog_priority[:3]]

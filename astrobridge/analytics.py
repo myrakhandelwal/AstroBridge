@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from collections import Counter
-from datetime import datetime
 import json
 import sqlite3
 import threading
-from typing import Any, Dict, List, Optional
+from collections import Counter
+from datetime import datetime
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
-from astrobridge.state_store import resolve_state_db_path, connect_sqlite
+
+from astrobridge.state_store import connect_sqlite, resolve_state_db_path
 
 
 class AnalyticsEvent(BaseModel):
@@ -22,7 +23,7 @@ class AnalyticsEvent(BaseModel):
     success: Optional[bool] = Field(None, description="Whether operation completed")
     latency_ms: Optional[float] = Field(None, ge=0, description="Observed latency in milliseconds")
     catalog_count: Optional[int] = Field(None, ge=0, description="Number of catalogs touched")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional event metadata")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional event metadata")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -31,7 +32,7 @@ class AnalyticsStore:
 
     def __init__(self, db_path: Optional[str] = None, persist: bool = True) -> None:
         self.persist = persist
-        self._events: List[AnalyticsEvent] = []
+        self._events: list[AnalyticsEvent] = []
         self._lock = threading.Lock()
 
         if self.persist:
@@ -79,10 +80,9 @@ class AnalyticsStore:
 
     def record(self, event: AnalyticsEvent) -> AnalyticsEvent:
         if self.persist:
-            with self._lock:
-                with self._connect() as conn:
-                    conn.execute(
-                        """
+            with self._lock, self._connect() as conn:
+                conn.execute(
+                    """
                         INSERT INTO analytics_events (
                             event_type,
                             query_type,
@@ -94,18 +94,18 @@ class AnalyticsStore:
                             timestamp
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (
-                            event.event_type,
-                            event.query_type,
-                            event.user_level,
-                            None if event.success is None else int(event.success),
-                            event.latency_ms,
-                            event.catalog_count,
-                            json.dumps(event.metadata),
-                            event.timestamp.isoformat(),
-                        ),
-                    )
-                    conn.commit()
+                    (
+                        event.event_type,
+                        event.query_type,
+                        event.user_level,
+                        None if event.success is None else int(event.success),
+                        event.latency_ms,
+                        event.catalog_count,
+                        json.dumps(event.metadata),
+                        event.timestamp.isoformat(),
+                    ),
+                )
+                conn.commit()
         else:
             # Even in non-persistent mode, protect list access with lock
             with self._lock:
@@ -120,16 +120,15 @@ class AnalyticsStore:
                     conn.execute("DELETE FROM analytics_events")
                     conn.commit()
 
-    def list_events(self) -> List[AnalyticsEvent]:
+    def list_events(self) -> list[AnalyticsEvent]:
         if not self.persist:
             with self._lock:
                 return list(self._events)
 
-        with self._lock:
-            with self._connect() as conn:
-                conn.row_factory = sqlite3.Row
-                rows = conn.execute(
-                    """
+        with self._lock, self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
                     SELECT
                         event_type,
                         query_type,
@@ -142,10 +141,10 @@ class AnalyticsStore:
                     FROM analytics_events
                     ORDER BY id ASC
                     """
-                ).fetchall()
+            ).fetchall()
         return [self._event_from_row(row) for row in rows]
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         events = self.list_events()
         event_counts = Counter(evt.event_type for evt in events)
         query_events = [evt for evt in events if evt.query_type is not None]

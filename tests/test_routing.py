@@ -1,9 +1,6 @@
 """Tests for intelligent query routing."""
-import pytest
-from astrobridge.routing import NLPQueryRouter, CatalogRanker
-from astrobridge.routing.base import (
-    ObjectClass, CatalogType, RoutingDecision
-)
+from astrobridge.routing import CatalogRanker, NLPQueryRouter
+from astrobridge.routing.base import CatalogType, ObjectClass, RoutingDecision
 
 
 class TestObjectClassification:

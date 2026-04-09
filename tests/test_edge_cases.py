@@ -1,12 +1,14 @@
 """Edge case tests for AstroBridge robustness."""
-import pytest
 from datetime import datetime
-from astrobridge.models import Source, Coordinate, Uncertainty, Photometry, Provenance
-from astrobridge.matching import BayesianMatcher
-from astrobridge.routing import NLPQueryRouter
-from astrobridge.identify import identify_object
+
+import pytest
+
 from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
 from astrobridge.connectors import CatalogConnector
+from astrobridge.identify import identify_object
+from astrobridge.matching import BayesianMatcher
+from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty
+from astrobridge.routing import NLPQueryRouter
 
 
 class TestIdentifyEdgeCases:
@@ -188,8 +190,6 @@ class TestOrchestratorEdgeCases:
     @pytest.mark.asyncio
     async def test_execute_query_no_matches(self):
         """Query returning no sources should succeed gracefully."""
-        from astrobridge.connectors import CatalogConnector
-        from astrobridge.models import Source, Coordinate, Uncertainty, Photometry, Provenance
 
         class EmptyConnector(CatalogConnector):
             def query(self, name):
@@ -214,7 +214,6 @@ class TestOrchestratorEdgeCases:
     @pytest.mark.asyncio
     async def test_execute_query_very_large_radius(self):
         """Very large search radius should be handled."""
-        from astrobridge.connectors import CatalogConnector
 
         class SmallConnector(CatalogConnector):
             def query(self, name):

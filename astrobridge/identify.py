@@ -4,14 +4,13 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Optional
 
 from astrobridge.routing import NLPQueryRouter
-from astrobridge.routing.base import CatalogType, ObjectClass, RoutingDecision
+from astrobridge.routing.base import CatalogType, ObjectClass
 from astrobridge.routing.intelligent import CatalogRanker
 
-
-OBJECT_DESCRIPTIONS: Dict[ObjectClass, str] = {
+OBJECT_DESCRIPTIONS: dict[ObjectClass, str] = {
     ObjectClass.STAR: "This looks like a stellar source: a point-like object such as a dwarf, giant, or binary star.",
     ObjectClass.GALAXY: "This looks like a galaxy: an extended extragalactic system containing many stars, gas, and dust.",
     ObjectClass.QUASAR: "This looks like a quasar: an extremely luminous active galactic nucleus powered by a supermassive black hole.",
@@ -23,7 +22,7 @@ OBJECT_DESCRIPTIONS: Dict[ObjectClass, str] = {
 }
 
 
-KNOWN_DESIGNATION_HINTS: Dict[str, tuple[ObjectClass, str]] = {
+KNOWN_DESIGNATION_HINTS: dict[str, tuple[ObjectClass, str]] = {
     "m31": (ObjectClass.GALAXY, "M31 is the Andromeda Galaxy, a nearby spiral galaxy in the Local Group."),
     "andromedagalaxy": (ObjectClass.GALAXY, "The Andromeda Galaxy is a nearby spiral galaxy and one of the closest large galaxies to the Milky Way."),
     "m51": (ObjectClass.GALAXY, "M51 is the Whirlpool Galaxy, a classic interacting spiral galaxy."),
@@ -69,10 +68,10 @@ class IdentificationResult:
     object_class: ObjectClass
     description: str
     search_radius_arcsec: float
-    top_catalogs: List[str]
+    top_catalogs: list[str]
     reasoning: str
 
-    def as_dict(self) -> Dict[str, object]:
+    def as_dict(self) -> dict[str, object]:
         return {
             "input_text": self.input_text,
             "object_class": self.object_class.value,
@@ -185,7 +184,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: Optional[List[str]] = None) -> None:
+def main(argv: Optional[list[str]] = None) -> None:
     """Entry point for the astrobridge-identify command."""
     parser = build_parser()
     args = parser.parse_args(argv)

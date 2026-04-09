@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import time
 from statistics import mean
-from typing import Any, Dict, List
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -24,9 +24,9 @@ class BenchmarkRunner:
     def __init__(self, orchestrator: Any):
         self.orchestrator = orchestrator
 
-    async def run(self, config: BenchmarkConfig) -> Dict[str, Any]:
-        latencies_ms: List[float] = []
-        statuses: List[str] = []
+    async def run(self, config: BenchmarkConfig) -> dict[str, Any]:
+        latencies_ms: list[float] = []
+        statuses: list[str] = []
 
         workload = [
             QueryRequest(query_type="name", name="Proxima Centauri", auto_route=True),

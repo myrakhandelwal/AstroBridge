@@ -1,15 +1,26 @@
 """External catalog connectors."""
+from __future__ import annotations
+
 import asyncio
 import logging
 import time
-from datetime import datetime
-from typing import Any, List, Optional
 from abc import ABC, abstractmethod
-from .models import Coordinate, Photometry, Provenance, Source, Uncertainty
-from .geometry import angular_distance_arcsec
+from collections.abc import Sequence
+from datetime import datetime
+from typing import Any, Callable, Optional, Protocol, TypeVar
 
+from .geometry import angular_distance_arcsec
+from .models import Coordinate, Photometry, Provenance, Source, Uncertainty
 
 logger = logging.getLogger(__name__)
+
+
+class TapServiceProtocol(Protocol):
+    def search(self, adql: str) -> Sequence[Any]:
+        ...
+
+
+_T = TypeVar("_T")
 
 
 class CatalogConnector(ABC):
@@ -18,14 +29,14 @@ class CatalogConnector(ABC):
     @abstractmethod
     def query(self, name: str) -> Optional[Source]:
         """Query catalog for a source."""
-        pass
+        raise NotImplementedError
 
-    async def query_object(self, name: str) -> List[Source]:
+    async def query_object(self, name: str) -> list[Source]:
         """Async-compatible object lookup used by integration paths."""
         result = self.query(name)
         return [result] if result is not None else []
 
-    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> List[Source]:
+    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
         """Async-compatible cone search placeholder for future live catalog queries."""
         return []
 
@@ -181,12 +192,12 @@ class SimbadConnector(CatalogConnector):
 
         return None
 
-    async def query_object(self, name: str) -> List[Source]:
+    async def query_object(self, name: str) -> list[Source]:
         """Return SIMBAD sources for an object query."""
         result = self.query(name)
         return [result] if result is not None else []
 
-    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> List[Source]:
+    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
         """Return all SIMBAD sources within the specified radius."""
         if radius_arcsec <= 0:
             return []
@@ -249,12 +260,12 @@ class NEDConnector(CatalogConnector):
 
         return None
 
-    async def query_object(self, name: str) -> List[Source]:
+    async def query_object(self, name: str) -> list[Source]:
         """Return NED sources for an object query."""
         result = self.query(name)
         return [result] if result is not None else []
 
-    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> List[Source]:
+    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
         """Return all NED sources within the specified radius."""
         if radius_arcsec <= 0:
             return []
@@ -280,10 +291,11 @@ class SimbadTapAdapter(CatalogConnector):
         self,
         tap_url: str = DEFAULT_TAP_URL,
         max_records: int = 50,
-        tap_service: Any = None,
+        tap_service: Optional[TapServiceProtocol] = None,
         request_timeout_sec: float = 10.0,
         max_retries: int = 2,
         retry_delay_sec: float = 0.1,
+        max_concurrency: int = 8,
     ):
         """Initialize the TAP adapter.
 
@@ -294,12 +306,14 @@ class SimbadTapAdapter(CatalogConnector):
             request_timeout_sec: Timeout for async TAP calls
             max_retries: Number of retries after an initial failed attempt
             retry_delay_sec: Delay between retries in seconds
+            max_concurrency: Maximum concurrent in-flight TAP requests
         """
         self.tap_url = tap_url
         self.max_records = max_records
         self.request_timeout_sec = request_timeout_sec
         self.max_retries = max_retries
         self.retry_delay_sec = retry_delay_sec
+        self._request_semaphore = asyncio.Semaphore(max(1, max_concurrency))
 
         if tap_service is not None:
             self._service = tap_service
@@ -312,8 +326,7 @@ class SimbadTapAdapter(CatalogConnector):
                 "SimbadTapAdapter requires pyvo. Install with `pip install -e .[live]`."
             ) from exc
 
-        self._pyvo = _pyvo
-        self._service = self._pyvo.dal.TAPService(self.tap_url)
+        self._service: TapServiceProtocol = _pyvo.dal.TAPService(self.tap_url)
 
     def query(self, name: str) -> Optional[Source]:
         """Query SIMBAD TAP by object identifier."""
@@ -322,24 +335,18 @@ class SimbadTapAdapter(CatalogConnector):
             return None
         return self._row_to_source(results[0])
 
-    async def query_object(self, name: str) -> List[Source]:
+    async def query_object(self, name: str) -> list[Source]:
         """Async object lookup against SIMBAD TAP."""
         try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(self._query_object_sync, name),
-                timeout=self.request_timeout_sec,
-            )
+            return await self._run_io_bound(self._query_object_sync, name)
         except asyncio.TimeoutError:
             logger.warning("SIMBAD TAP name query timed out for %s", name)
             return []
 
-    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> List[Source]:
+    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
         """Async cone search against SIMBAD TAP."""
         try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(self._cone_search_sync, coordinate, radius_arcsec),
-                timeout=self.request_timeout_sec,
-            )
+            return await self._run_io_bound(self._cone_search_sync, coordinate, radius_arcsec)
         except asyncio.TimeoutError:
             logger.warning(
                 "SIMBAD TAP cone search timed out at RA=%s Dec=%s",
@@ -348,11 +355,19 @@ class SimbadTapAdapter(CatalogConnector):
             )
             return []
 
-    def _query_object_sync(self, name: str) -> List[Source]:
+    async def _run_io_bound(self, func: Callable[..., _T], *args: Any) -> _T:
+        """Run blocking TAP I/O in a bounded worker thread."""
+        async with self._request_semaphore:
+            return await asyncio.wait_for(
+                asyncio.to_thread(func, *args),
+                timeout=self.request_timeout_sec,
+            )
+
+    def _query_object_sync(self, name: str) -> list[Source]:
         rows = self._query_by_name(name)
         return [self._row_to_source(row) for row in rows]
 
-    def _cone_search_sync(self, coordinate: Coordinate, radius_arcsec: float) -> List[Source]:
+    def _cone_search_sync(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
         if radius_arcsec <= 0:
             return []
 
@@ -376,7 +391,7 @@ class SimbadTapAdapter(CatalogConnector):
         rows = self._search_with_retries(adql, context="cone search")
         return [self._row_to_source(row) for row in rows]
 
-    def _query_by_name(self, name: str) -> List[Any]:
+    def _query_by_name(self, name: str) -> list[Any]:
         normalized = name.strip()
         if not normalized:
             return []
@@ -404,7 +419,7 @@ class SimbadTapAdapter(CatalogConnector):
         return self._search_with_retries(adql, context=f"name query for {name}")
 
     @staticmethod
-    def _value(row: Any, keys: List[str], default: Any = None) -> Any:
+    def _value(row: Any, keys: list[str], default: Any = None) -> Any:
         """Read first available key from TAP row using common key aliases.
         
         Attempts to access row using bracket notation, then attribute access,
@@ -440,7 +455,7 @@ class SimbadTapAdapter(CatalogConnector):
         except (TypeError, ValueError):
             return default
 
-    def _search_with_retries(self, adql: str, context: str) -> List[Any]:
+    def _search_with_retries(self, adql: str, context: str) -> list[Any]:
         """Execute TAP query with retry-on-failure behavior."""
         attempts = self.max_retries + 1
         for attempt in range(attempts):
@@ -495,10 +510,11 @@ class NedTapAdapter(CatalogConnector):
         self,
         tap_url: str = DEFAULT_TAP_URL,
         max_records: int = 50,
-        tap_service: Any = None,
+        tap_service: Optional[TapServiceProtocol] = None,
         request_timeout_sec: float = 10.0,
         max_retries: int = 2,
         retry_delay_sec: float = 0.1,
+        max_concurrency: int = 8,
     ):
         """Initialize the NED TAP adapter.
 
@@ -509,12 +525,14 @@ class NedTapAdapter(CatalogConnector):
             request_timeout_sec: Timeout for async TAP calls
             max_retries: Number of retries after an initial failed attempt
             retry_delay_sec: Delay between retries in seconds
+            max_concurrency: Maximum concurrent in-flight TAP requests
         """
         self.tap_url = tap_url
         self.max_records = max_records
         self.request_timeout_sec = request_timeout_sec
         self.max_retries = max_retries
         self.retry_delay_sec = retry_delay_sec
+        self._request_semaphore = asyncio.Semaphore(max(1, max_concurrency))
 
         if tap_service is not None:
             self._service = tap_service
@@ -527,7 +545,7 @@ class NedTapAdapter(CatalogConnector):
                 "NedTapAdapter requires pyvo. Install with `pip install -e .[live]`."
             ) from exc
 
-        self._service = _pyvo.dal.TAPService(self.tap_url)
+        self._service: TapServiceProtocol = _pyvo.dal.TAPService(self.tap_url)
 
     def query(self, name: str) -> Optional[Source]:
         """Query NED TAP by object identifier."""
@@ -536,24 +554,18 @@ class NedTapAdapter(CatalogConnector):
             return None
         return self._row_to_source(rows[0])
 
-    async def query_object(self, name: str) -> List[Source]:
+    async def query_object(self, name: str) -> list[Source]:
         """Async object lookup against NED TAP."""
         try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(self._query_object_sync, name),
-                timeout=self.request_timeout_sec,
-            )
+            return await self._run_io_bound(self._query_object_sync, name)
         except asyncio.TimeoutError:
             logger.warning("NED TAP name query timed out for %s", name)
             return []
 
-    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> List[Source]:
+    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
         """Async cone search against NED TAP."""
         try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(self._cone_search_sync, coordinate, radius_arcsec),
-                timeout=self.request_timeout_sec,
-            )
+            return await self._run_io_bound(self._cone_search_sync, coordinate, radius_arcsec)
         except asyncio.TimeoutError:
             logger.warning(
                 "NED TAP cone search timed out at RA=%s Dec=%s",
@@ -562,11 +574,19 @@ class NedTapAdapter(CatalogConnector):
             )
             return []
 
-    def _query_object_sync(self, name: str) -> List[Source]:
+    async def _run_io_bound(self, func: Callable[..., _T], *args: Any) -> _T:
+        """Run blocking TAP I/O in a bounded worker thread."""
+        async with self._request_semaphore:
+            return await asyncio.wait_for(
+                asyncio.to_thread(func, *args),
+                timeout=self.request_timeout_sec,
+            )
+
+    def _query_object_sync(self, name: str) -> list[Source]:
         rows = self._query_by_name(name)
         return [self._row_to_source(row) for row in rows]
 
-    def _cone_search_sync(self, coordinate: Coordinate, radius_arcsec: float) -> List[Source]:
+    def _cone_search_sync(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
         if radius_arcsec <= 0:
             return []
 
@@ -589,7 +609,7 @@ class NedTapAdapter(CatalogConnector):
         rows = self._search_with_retries(adql, context="cone search")
         return [self._row_to_source(row) for row in rows]
 
-    def _query_by_name(self, name: str) -> List[Any]:
+    def _query_by_name(self, name: str) -> list[Any]:
         normalized = name.strip()
         if not normalized:
             return []
@@ -615,7 +635,7 @@ class NedTapAdapter(CatalogConnector):
         return self._search_with_retries(adql, context=f"name query for {name}")
 
     @staticmethod
-    def _value(row: Any, keys: List[str], default: Any = None) -> Any:
+    def _value(row: Any, keys: list[str], default: Any = None) -> Any:
         """Read first available key from TAP row using common key aliases.
         
         Attempts to access row using bracket notation, then attribute access,
@@ -651,7 +671,7 @@ class NedTapAdapter(CatalogConnector):
         except (TypeError, ValueError):
             return default
 
-    def _search_with_retries(self, adql: str, context: str) -> List[Any]:
+    def _search_with_retries(self, adql: str, context: str) -> list[Any]:
         """Execute TAP query with retry-on-failure behavior."""
         attempts = self.max_retries + 1
         for attempt in range(attempts):

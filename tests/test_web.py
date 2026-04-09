@@ -13,7 +13,6 @@ os.environ.setdefault(
 
 from astrobridge.web.app import app
 
-
 client = TestClient(app)
 
 

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from astrobridge.identify import identify_object, format_identification
+from astrobridge.identify import format_identification, identify_object
 from astrobridge.routing.base import ObjectClass
 
 

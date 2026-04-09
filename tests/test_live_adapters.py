@@ -1,5 +1,7 @@
 """Unit tests for live TAP adapters using injected fake services."""
 
+import asyncio
+
 import pytest
 
 from astrobridge.connectors import NedTapAdapter, SimbadTapAdapter
@@ -44,6 +46,35 @@ class SlowTapService:
         self.queries.append(adql)
         time.sleep(self.delay_sec)
         return []
+
+
+class ConcurrentTapService:
+    """Service that tracks peak concurrent in-flight searches."""
+
+    def __init__(self, delay_sec=0.02):
+        import threading
+
+        self.delay_sec = delay_sec
+        self.queries = []
+        self._active = 0
+        self.max_active = 0
+        self._lock = threading.Lock()
+
+    def search(self, adql):
+        import time
+
+        with self._lock:
+            self._active += 1
+            if self._active > self.max_active:
+                self.max_active = self._active
+
+        try:
+            self.queries.append(adql)
+            time.sleep(self.delay_sec)
+            return []
+        finally:
+            with self._lock:
+                self._active -= 1
 
 
 @pytest.mark.asyncio
@@ -204,3 +235,33 @@ async def test_ned_tap_malformed_numeric_values_fallback_to_defaults():
     assert len(results) == 1
     assert results[0].coordinate.ra == 0.0
     assert results[0].coordinate.dec == 0.0
+
+
+@pytest.mark.asyncio
+async def test_simbad_tap_honors_max_concurrency_bound():
+    service = ConcurrentTapService(delay_sec=0.02)
+    adapter = SimbadTapAdapter(
+        tap_service=service,
+        max_concurrency=2,
+        request_timeout_sec=1.0,
+    )
+
+    await asyncio.gather(*[adapter.query_object(f"obj-{idx}") for idx in range(6)])
+
+    assert len(service.queries) == 6
+    assert service.max_active <= 2
+
+
+@pytest.mark.asyncio
+async def test_ned_tap_honors_max_concurrency_bound():
+    service = ConcurrentTapService(delay_sec=0.02)
+    adapter = NedTapAdapter(
+        tap_service=service,
+        max_concurrency=3,
+        request_timeout_sec=1.0,
+    )
+
+    await asyncio.gather(*[adapter.query_object(f"obj-{idx}") for idx in range(7)])
+
+    assert len(service.queries) == 7
+    assert service.max_active <= 3

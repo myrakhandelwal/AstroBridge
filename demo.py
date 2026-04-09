@@ -7,18 +7,17 @@ import asyncio
 import os
 import tempfile
 from datetime import datetime
-from astrobridge.routing import NLPQueryRouter
-from astrobridge.routing.base import CatalogType, ObjectClass
-from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
-from astrobridge.matching import BayesianMatcher, MatcherConfig
-from astrobridge.models import Source, Coordinate, Uncertainty, Photometry, Provenance
-from astrobridge.identify import identify_object, format_identification
+
 from astrobridge.analytics import AnalyticsEvent, AnalyticsStore
-from astrobridge.jobs import JobManager, JobRecord
+from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
 from astrobridge.benchmarking import BenchmarkConfig, BenchmarkRunner
-
-
 from astrobridge.connectors import CatalogConnector
+from astrobridge.identify import format_identification, identify_object
+from astrobridge.jobs import JobManager, JobRecord
+from astrobridge.matching import BayesianMatcher
+from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty
+from astrobridge.routing import NLPQueryRouter
+from astrobridge.routing.base import CatalogType
 
 
 class DemoConnector(CatalogConnector):
@@ -91,7 +90,7 @@ def demo_phase5_routing() -> None:
         
         print(f"  Object Type: {decision.object_class.value}")
         print(f"  Search Radius: {decision.search_radius_arcsec} arcsec")
-        print(f"  Top 3 Catalogs:")
+        print("  Top 3 Catalogs:")
         
         for i, (catalog, score) in enumerate(decision.catalog_priority[:3], 1):
             print(f"    {i}. {catalog.value:12s} (score: {score:.2f})")
@@ -149,15 +148,15 @@ def demo_phase4_matching() -> None:
     # Close sources (should match)
     prob_close = matcher.calculate_match_probability(source1, source2)
     print(f"Proxima (SIMBAD) vs Proxima (Gaia): {prob_close:.4f}")
-    print(f"  → These are the SAME object (nearby, similar magnitudes)")
+    print("  → These are the SAME object (nearby, similar magnitudes)")
     
     # Far sources (should not match)
     prob_far = matcher.calculate_match_probability(source1, source3)
     print(f"\nProxima vs Rigel: {prob_far:.4f}")
-    print(f"  → These are DIFFERENT objects (far apart, different magnitudes)")
+    print("  → These are DIFFERENT objects (far apart, different magnitudes)")
     
     # Full matching
-    print(f"\n\nPerforming full cross-match:")
+    print("\n\nPerforming full cross-match:")
     matches = matcher.match([source1], [source2, source3])
     
     print(f"Found {len(matches)} match(es):\n")
@@ -364,11 +363,11 @@ def demo_phase2_models() -> None:
     print(f"Name: {source.name}")
     print(f"Coordinates: RA={source.coordinate.ra:.3f}°, Dec={source.coordinate.dec:.3f}°")
     print(f"Uncertainty: σ_RA={source.uncertainty.ra_error}″, σ_Dec={source.uncertainty.dec_error}″")
-    print(f"Photometry:")
+    print("Photometry:")
     for phot in source.photometry:
         print(f"  {phot.band}-band: {phot.magnitude:.2f} mag")
     print(f"Source: {source.provenance.catalog_name} v{source.provenance.catalog_version}")
-    print(f"\n✓ All fields type-validated by Pydantic")
+    print("\n✓ All fields type-validated by Pydantic")
 
 
 def main() -> None:

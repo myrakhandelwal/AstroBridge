@@ -1,8 +1,10 @@
 """Tests for confidence scoring in source matching."""
-import pytest
 from datetime import datetime
-from astrobridge.models import Source, Coordinate, Uncertainty, Photometry, Provenance, MatchResult
-from astrobridge.matching.confidence import ConfidenceScorer, MatchScore
+
+import pytest
+
+from astrobridge.matching.confidence import ConfidenceScorer
+from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty
 
 
 @pytest.fixture

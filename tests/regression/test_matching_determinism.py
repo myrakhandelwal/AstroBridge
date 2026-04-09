@@ -1,10 +1,10 @@
 """Regression tests for deterministic matching output."""
-import pytest
 from datetime import datetime
+
+import pytest
+
 from astrobridge.matching import BayesianMatcher
-from astrobridge.models import (
-    Source, Coordinate, Uncertainty, Photometry, Provenance
-)
+from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty
 
 
 @pytest.fixture

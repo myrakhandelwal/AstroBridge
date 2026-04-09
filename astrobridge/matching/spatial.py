@@ -1,14 +1,15 @@
 """Spatial indexing for efficient candidate generation."""
+
 import numpy as np
-from typing import List, Tuple
-from astrobridge.models import Source
+
 from astrobridge.geometry import angular_distance_deg
+from astrobridge.models import Source
 
 
 class SpatialIndex:
     """Simple spatial index for fast nearest neighbor queries."""
     
-    def __init__(self, sources: List[Source], partition_size: int = 100):
+    def __init__(self, sources: list[Source], partition_size: int = 100):
         """
         Initialize spatial index.
         
@@ -27,7 +28,7 @@ class SpatialIndex:
             return
         
         # Extract coordinates
-        coords = np.array([
+        np.array([
             (s.coordinate.ra, s.coordinate.dec) 
             for s in self.sources
         ])
@@ -46,7 +47,7 @@ class SpatialIndex:
                 self.grid[cell] = []
             self.grid[cell].append(i)
     
-    def _get_cell(self, ra: float, dec: float) -> Tuple[int, int]:
+    def _get_cell(self, ra: float, dec: float) -> tuple[int, int]:
         """Get grid cell for coordinates."""
         ra_cell = int((ra - self.ra_min) / self.ra_cell_size)
         dec_cell = int((dec - self.dec_min) / self.dec_cell_size)
@@ -56,7 +57,7 @@ class SpatialIndex:
         
         return (ra_cell, dec_cell)
     
-    def query_radius(self, ra: float, dec: float, radius_arcsec: float) -> List[int]:
+    def query_radius(self, ra: float, dec: float, radius_arcsec: float) -> list[int]:
         """
         Find sources within radius of given coordinates.
         

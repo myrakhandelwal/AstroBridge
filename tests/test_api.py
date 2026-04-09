@@ -1,13 +1,17 @@
 """Tests for API orchestration."""
-import pytest
-import asyncio
 from datetime import datetime
+
+import pytest
+
 from astrobridge.api import (
-    QueryRequest, QueryResponse, SourceResponse, MatchResponse,
-    AstroBridgeOrchestrator, OrchestrationError
+    AstroBridgeOrchestrator,
+    MatchResponse,
+    QueryRequest,
+    QueryResponse,
+    SourceResponse,
 )
-from astrobridge.routing import NLPQueryRouter
 from astrobridge.matching import BayesianMatcher
+from astrobridge.routing import NLPQueryRouter
 
 
 class TestQuerySchemas:
@@ -296,7 +300,7 @@ class TestQueryExecution:
 
     async def test_execute_query_returns_cross_catalog_matches(self):
         """Name queries across multiple connectors should emit matches."""
-        from astrobridge.connectors import SimbadConnector, NEDConnector
+        from astrobridge.connectors import NEDConnector, SimbadConnector
 
         orchestrator = AstroBridgeOrchestrator(
             matcher=BayesianMatcher(confidence_threshold=0.01),
@@ -321,7 +325,7 @@ class TestQueryExecution:
     async def test_execute_coordinate_query_calls_connector_cone_search(self):
         """Coordinate queries should delegate to connector cone_search."""
         from astrobridge.connectors import CatalogConnector
-        from astrobridge.models import Source, Coordinate, Uncertainty, Photometry, Provenance
+        from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty
 
         class CoordinateConnector(CatalogConnector):
             def __init__(self):
@@ -407,8 +411,9 @@ class TestSourceConversion:
     
     def test_source_to_response_conversion(self):
         """Test converting Source model to response."""
-        from astrobridge.models import Source, Coordinate, Provenance, Photometry
         from datetime import datetime
+
+        from astrobridge.models import Coordinate, Photometry, Provenance, Source
         
         prov = Provenance(
             catalog_name="Test",

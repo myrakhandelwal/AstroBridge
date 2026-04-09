@@ -1,8 +1,10 @@
 """Confidence scoring for astronomical source matches."""
 import logging
-import numpy as np
 from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict
+
+import numpy as np
+from pydantic import BaseModel, ConfigDict, Field
+
 from astrobridge.models import Source
 
 logger = logging.getLogger(__name__)

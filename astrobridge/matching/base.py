@@ -1,6 +1,6 @@
 """Base matcher classes and exceptions."""
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import Any
 
 
 class MatcherError(Exception):
@@ -12,7 +12,7 @@ class Matcher(ABC):
     """Abstract base class for astronomical source matchers."""
     
     @abstractmethod
-    def match(self, sources1: List[Any], sources2: List[Any]) -> Dict[str, Any]:
+    def match(self, sources1: list[Any], sources2: list[Any]) -> dict[str, Any]:
         """
         Match sources from two lists.
         

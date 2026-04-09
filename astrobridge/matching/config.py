@@ -1,6 +1,6 @@
 """Matching configuration and scoring parameters."""
-from typing import Dict, Any
 from enum import Enum
+from typing import Any
 
 
 class ObjectType(str, Enum):
@@ -60,6 +60,6 @@ class MatcherConfig:
         """Set configuration parameter."""
         self.params[name] = value
     
-    def get_all_params(self) -> Dict[str, Any]:
+    def get_all_params(self) -> dict[str, Any]:
         """Get all parameters."""
         return self.params.copy()

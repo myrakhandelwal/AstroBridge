@@ -1,6 +1,6 @@
 """Query routing module for intelligent catalog selection."""
 from .base import QueryRouter, RouterError
-from .intelligent import NLPQueryRouter, CatalogRanker
+from .intelligent import CatalogRanker, NLPQueryRouter
 
 __all__ = [
     "QueryRouter",

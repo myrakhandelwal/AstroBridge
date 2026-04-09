@@ -1,13 +1,15 @@
 """Probabilistic cross-matching implementation."""
 import logging
-import numpy as np
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Tuple
-from astrobridge.models import Source, MatchResult
+from typing import Optional
+
+import numpy as np
+
 from astrobridge.geometry import angular_distance_deg
-from astrobridge.matching.base import Matcher, MatcherError
-from astrobridge.matching.spatial import SpatialIndex
+from astrobridge.matching.base import Matcher
 from astrobridge.matching.confidence import ConfidenceScorer
+from astrobridge.matching.spatial import SpatialIndex
+from astrobridge.models import MatchResult, Source
 
 logger = logging.getLogger(__name__)
 
@@ -43,9 +45,9 @@ class BayesianMatcher(Matcher):
     
     def match(
         self, 
-        ref_sources: List[Source], 
-        candidate_sources: List[Source]
-    ) -> List[MatchResult]:
+        ref_sources: list[Source], 
+        candidate_sources: list[Source]
+    ) -> list[MatchResult]:
         """
         Match reference sources to candidates.
         
@@ -227,7 +229,7 @@ class BayesianMatcher(Matcher):
         
         logger.info(f"Thresholds updated: conf={self.confidence_threshold}, sigma={self.positional_sigma_threshold}")
     
-    def get_calibration_metrics(self) -> Dict[str, float]:
+    def get_calibration_metrics(self) -> dict[str, float]:
         """Get calibration metrics."""
         return self.calibration_metrics.copy()
     
@@ -353,7 +355,7 @@ class BayesianMatcher(Matcher):
         return angular_distance_deg(ra1, dec1, ra2, dec2)
 
     @staticmethod
-    def _coordinate_at_epoch(source: Source, target_epoch: datetime) -> Tuple[float, float]:
+    def _coordinate_at_epoch(source: Source, target_epoch: datetime) -> tuple[float, float]:
         """Project source coordinates to a target epoch using linear proper motion.
         
         Note: If proper motion pushes declination outside [-90, 90] degrees,

@@ -1,7 +1,8 @@
 """Data schemas for API requests and responses."""
-from typing import List, Optional, Dict, Any, Literal
-from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import datetime
+from typing import Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class SourceRequest(BaseModel):
@@ -25,7 +26,7 @@ class QueryRequest(BaseModel):
     name: Optional[str] = Field(None, description="Object name for name queries")
     coordinates: Optional[CoordinateRequest] = Field(None, description="Coordinates for cone searches")
     description: Optional[str] = Field(None, description="Natural language description")
-    catalogs: Optional[List[str]] = Field(None, description="Specific catalogs to query (optional)")
+    catalogs: Optional[list[str]] = Field(None, description="Specific catalogs to query (optional)")
     auto_route: bool = Field(
         default=True,
         description="Use intelligent routing to select best catalogs"
@@ -126,12 +127,12 @@ class QueryResponse(BaseModel):
         description="Query status: 'success', 'partial', 'error'"
     )
     query_type: str = Field(..., description="Type of query executed")
-    catalogs_queried: List[str] = Field(..., description="Catalogs that were queried")
-    sources: List[SourceResponse] = Field(
+    catalogs_queried: list[str] = Field(..., description="Catalogs that were queried")
+    sources: list[SourceResponse] = Field(
         ...,
         description="Sources found across all catalogs"
     )
-    matches: List[MatchResponse] = Field(
+    matches: list[MatchResponse] = Field(
         default_factory=list,
         description="Cross-catalog matches found"
     )
@@ -140,4 +141,4 @@ class QueryResponse(BaseModel):
         description="Explanation of catalog routing decision"
     )
     execution_time_ms: float = Field(..., description="Query execution time in milliseconds")
-    errors: List[str] = Field(default_factory=list, description="Any errors encountered")
+    errors: list[str] = Field(default_factory=list, description="Any errors encountered")

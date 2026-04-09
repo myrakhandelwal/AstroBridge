@@ -1,13 +1,20 @@
 """API orchestrator for multi-catalog queries."""
-import logging
+from __future__ import annotations
+
 import asyncio
+import logging
 import time
 import uuid
-from typing import List, Dict, Any, Optional
+from collections.abc import Awaitable, Mapping
 from datetime import datetime
-from .schemas import QueryRequest, QueryResponse, SourceResponse, MatchResponse
+from typing import Optional, Protocol
+
+from astrobridge.connectors import CatalogConnector
 from astrobridge.matching.confidence import ConfidenceScorer
 from astrobridge.models import Coordinate, Source
+from astrobridge.routing.base import QueryRouter
+
+from .schemas import MatchResponse, QueryRequest, QueryResponse, SourceResponse
 
 logger = logging.getLogger(__name__)
 
@@ -17,10 +24,32 @@ class OrchestrationError(Exception):
     pass
 
 
+class _MatchResultLike(Protocol):
+    source1_id: str
+    source2_id: str
+    match_probability: float
+    separation_arcsec: float
+    confidence: float
+
+
+class _MatcherLike(Protocol):
+    proper_motion_aware: bool
+    match_epoch: Optional[datetime]
+    confidence_scorer: ConfidenceScorer
+
+    def match(self, sources1: list[Source], sources2: list[Source]) -> list[_MatchResultLike]:
+        ...
+
+
 class AstroBridgeOrchestrator:
     """Orchestrates multi-catalog queries and cross-matching."""
     
-    def __init__(self, router=None, matcher=None, connectors=None):
+    def __init__(
+        self,
+        router: Optional[QueryRouter] = None,
+        matcher: Optional[_MatcherLike] = None,
+        connectors: Optional[Mapping[str, CatalogConnector]] = None,
+    ):
         """
         Initialize orchestrator.
         
@@ -31,7 +60,7 @@ class AstroBridgeOrchestrator:
         """
         self.router = router
         self.matcher = matcher
-        self.connectors = connectors or {}
+        self.connectors: dict[str, CatalogConnector] = dict(connectors or {})
         logger.info(f"Initialized AstroBridgeOrchestrator with {len(self.connectors)} connectors")
     
     async def execute_query(self, request: QueryRequest) -> QueryResponse:
@@ -57,7 +86,7 @@ class AstroBridgeOrchestrator:
                 routing_decision = self.router.parse_query(
                     request.description or request.name or ""
                 )
-                catalogs_to_query = routing_decision.get_top_catalogs(n=3)
+                catalogs_to_query = [str(catalog) for catalog in routing_decision.get_top_catalogs(n=3)]
                 routing_reasoning = routing_decision.reasoning
                 logger.debug(f"Query {query_id}: Routed to {catalogs_to_query}")
             else:
@@ -66,11 +95,11 @@ class AstroBridgeOrchestrator:
                 logger.debug(f"Query {query_id}: Using explicit catalogs {catalogs_to_query}")
             
             # Query catalogs
-            sources_by_catalog = {}
-            errors = []
+            sources_by_catalog: dict[str, list[Source]] = {}
+            errors: list[str] = []
             
-            query_tasks = []
-            task_catalogs = []
+            query_tasks: list[Awaitable[list[Source]]] = []
+            task_catalogs: list[str] = []
             for catalog in catalogs_to_query:
                 if catalog in self.connectors:
                     task = self._query_catalog(query_id, catalog, request)
@@ -92,8 +121,8 @@ class AstroBridgeOrchestrator:
                     sources_by_catalog[catalog] = result
             
             # Flatten all sources and convert to API response models.
-            all_sources = []
-            source_responses = []
+            all_sources: list[Source] = []
+            source_responses: list[SourceResponse] = []
             for catalog, sources in sources_by_catalog.items():
                 all_sources.extend(sources)
                 source_responses.extend(
@@ -102,7 +131,7 @@ class AstroBridgeOrchestrator:
                 )
             
             # Cross-match sources
-            matches = []
+            matches: list[MatchResponse] = []
             if self.matcher and len(all_sources) > 1:
                 try:
                     matches = self._cross_match_sources(sources_by_catalog)
@@ -207,7 +236,7 @@ class AstroBridgeOrchestrator:
         query_id: str,
         catalog: str,
         request: QueryRequest
-    ) -> List[Source]:
+    ) -> list[Source]:
         """
         Query a single catalog.
         
@@ -273,7 +302,7 @@ class AstroBridgeOrchestrator:
             magnitude=first_magnitude,
         )
     
-    def _cross_match_sources(self, sources_by_catalog: Dict[str, List[Source]]) -> List[MatchResponse]:
+    def _cross_match_sources(self, sources_by_catalog: dict[str, list[Source]]) -> list[MatchResponse]:
         """
         Cross-match sources from different catalogs.
         
@@ -321,7 +350,7 @@ class AstroBridgeOrchestrator:
 
         return matches
     
-    def add_connector(self, catalog: str, connector: Any) -> None:
+    def add_connector(self, catalog: str, connector: CatalogConnector) -> None:
         """
         Register a catalog connector.
         
@@ -332,12 +361,12 @@ class AstroBridgeOrchestrator:
         self.connectors[catalog] = connector
         logger.info(f"Registered connector for {catalog}")
     
-    def set_router(self, router: Any) -> None:
+    def set_router(self, router: QueryRouter) -> None:
         """Set the query router for intelligent catalog selection."""
         self.router = router
         logger.info("Set query router for intelligent routing")
     
-    def set_matcher(self, matcher: Any) -> None:
+    def set_matcher(self, matcher: _MatcherLike) -> None:
         """Set the matcher for cross-matching."""
         self.matcher = matcher
         logger.info("Set matcher for cross-matching")

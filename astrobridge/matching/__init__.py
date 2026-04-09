@@ -1,9 +1,9 @@
 from .base import Matcher, MatcherError
-from .probabilistic import BayesianMatcher
-from .spatial import SpatialIndex
-from .config import MatcherConfig, ObjectType
 from .calibrator import MatcherCalibrator
 from .confidence import ConfidenceScorer, MatchScore
+from .config import MatcherConfig, ObjectType
+from .probabilistic import BayesianMatcher
+from .spatial import SpatialIndex
 
 __all__ = [
     "Matcher",
