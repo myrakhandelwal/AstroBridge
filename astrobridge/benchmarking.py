@@ -54,8 +54,20 @@ class BenchmarkRunner:
         success_rate = completed / len(statuses)
         sorted_lat = sorted(latencies_ms)
 
-        p50_index = int(0.5 * (len(sorted_lat) - 1))
-        p95_index = int(0.95 * (len(sorted_lat) - 1))
+        # Calculate percentiles using proper nearest-rank method with rounding
+        # Handles edge cases for small sample sizes
+        if len(sorted_lat) == 0:
+            return {
+                "iterations": config.iterations,
+                "status_counts": {"success": 0, "partial": 0, "error": 0},
+                "success_rate": 0.0,
+                "latency_ms": {"mean": 0.0, "p50": 0.0, "p95": 0.0, "max": 0.0},
+            }
+
+        # For percentile p, the index is round(p * (n-1)) where n is sample size
+        # This gives the nearest rank and ensures proper interpolation for small samples
+        p50_index = min(len(sorted_lat) - 1, max(0, round(0.50 * (len(sorted_lat) - 1))))
+        p95_index = min(len(sorted_lat) - 1, max(0, round(0.95 * (len(sorted_lat) - 1))))
 
         return {
             "iterations": config.iterations,

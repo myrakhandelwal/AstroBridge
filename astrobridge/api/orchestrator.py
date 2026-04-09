@@ -252,7 +252,17 @@ class AstroBridgeOrchestrator:
         return sources
     
     def _source_to_response(self, source: Source, catalog: str) -> SourceResponse:
-        """Convert a Source model to SourceResponse."""
+        """Convert a Source model to SourceResponse.
+        
+        Safely extracts the first magnitude from photometry list, defaulting to None
+        if the list is empty or missing.
+        """
+        # Use next() with default instead of [0] to safely handle empty sequences
+        first_magnitude = next(
+            (p.magnitude for p in source.photometry),
+            None  # Default value if generator is exhausted
+        ) if source.photometry else None
+        
         return SourceResponse(
             id=source.id,
             name=source.name,
@@ -260,7 +270,7 @@ class AstroBridgeOrchestrator:
             dec=source.coordinate.dec,
             catalog=catalog,
             object_type=None,
-            magnitude=source.photometry[0].magnitude if source.photometry else None,
+            magnitude=first_magnitude,
         )
     
     def _cross_match_sources(self, sources_by_catalog: Dict[str, List[Source]]) -> List[MatchResponse]:

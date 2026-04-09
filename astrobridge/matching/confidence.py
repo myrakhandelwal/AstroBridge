@@ -214,6 +214,14 @@ class ConfidenceScorer:
             mag_diff = abs(bands1[band] - bands2[band])
             mag_diffs.append(mag_diff)
         
+        # Defensive check: mag_diffs should never be empty if common_bands is non-empty
+        if not mag_diffs:
+            logger.warning(
+                "Photometric scoring: common_bands non-empty but mag_diffs empty. "
+                "This should not happen. Returning None."
+            )
+            return None
+        
         mean_mag_diff = sum(mag_diffs) / len(mag_diffs)
         
         # Keep scoring consistent with BayesianMatcher photometric likelihood.

@@ -354,7 +354,11 @@ class BayesianMatcher(Matcher):
 
     @staticmethod
     def _coordinate_at_epoch(source: Source, target_epoch: datetime) -> Tuple[float, float]:
-        """Project source coordinates to a target epoch using linear proper motion."""
+        """Project source coordinates to a target epoch using linear proper motion.
+        
+        Note: If proper motion pushes declination outside [-90, 90] degrees,
+        a warning is logged and the value is clamped to valid range.
+        """
         ra = source.coordinate.ra
         dec = source.coordinate.dec
 
@@ -368,5 +372,16 @@ class BayesianMatcher(Matcher):
         dec += (pm_dec * delta_years) / (1000.0 * 3600.0)
 
         ra = ra % 360.0
+        
+        # Check for out-of-bounds declination and warn before clamping
+        if dec < -90.0 or dec > 90.0:
+            logger.warning(
+                "Source %s proper motion projection resulted in out-of-bounds "
+                "declination %.4f at epoch %s. Clamping to valid range [-90, 90]. "
+                "Original declination: %.4f, PM: %.4f mas/yr, Delta years: %.4f",
+                source.id, dec, target_epoch.isoformat(), source.coordinate.dec,
+                pm_dec, delta_years
+            )
+        
         dec = max(-90.0, min(90.0, dec))
         return ra, dec

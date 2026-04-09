@@ -64,6 +64,34 @@ class CatalogConnector(ABC):
             coord2.dec,
         )
 
+    @staticmethod
+    def _escape_adql_string(value: str) -> str:
+        """Safely escape a string for use in ADQL queries.
+        
+        ADQL uses single quotes, so we escape them by doubling.
+        Additionally, validates the string contains only safe characters.
+        
+        Args:
+            value: String to escape for ADQL.
+            
+        Returns:
+            Properly escaped ADQL string literal (without quotes).
+            
+        Raises:
+            ValueError: If string contains potentially dangerous patterns.
+        """
+        # First, check for potentially dangerous patterns
+        dangerous_patterns = ['--', '/*', '*/', ';', '\x00']
+        value_lower = value.lower()
+        for pattern in dangerous_patterns:
+            if pattern in value_lower:
+                raise ValueError(
+                    f"String contains potentially dangerous pattern: {pattern}"
+                )
+        
+        # Escape single quotes by doubling them (ADQL standard)
+        return value.replace("'", "''")
+
 
 def _build_source(
     *,
@@ -353,7 +381,12 @@ class SimbadTapAdapter(CatalogConnector):
         if not normalized:
             return []
 
-        escaped_name = normalized.replace("'", "''")
+        try:
+            escaped_name = self._escape_adql_string(normalized)
+        except ValueError as exc:
+            logger.warning("Invalid object name for SIMBAD query: %s - %s", name, exc)
+            return []
+            
         adql = f"""
             SELECT TOP 1
                 b.main_id,
@@ -372,19 +405,28 @@ class SimbadTapAdapter(CatalogConnector):
 
     @staticmethod
     def _value(row: Any, keys: List[str], default: Any = None) -> Any:
-        """Read first available key from TAP row using common key aliases."""
+        """Read first available key from TAP row using common key aliases.
+        
+        Attempts to access row using bracket notation, then attribute access,
+        and returns the first successfully retrieved value.
+        """
         for key in keys:
             value = None
             found = False
             try:
                 value = row[key]
                 found = True
-            except Exception:
+            except (KeyError, TypeError):
+                # KeyError: dict-like object doesn't have the key
+                # TypeError: object doesn't support item access
                 pass
 
             if not found and hasattr(row, key):
-                value = getattr(row, key)
-                found = True
+                try:
+                    value = getattr(row, key)
+                    found = True
+                except AttributeError:
+                    pass
 
             if found and value is not None:
                 return value
@@ -416,8 +458,10 @@ class SimbadTapAdapter(CatalogConnector):
         main_id = str(self._value(row, ["main_id", "MAIN_ID"], "UNKNOWN")).strip()
         ra = self._safe_float(self._value(row, ["ra", "RA"], 0.0), 0.0)
         dec = self._safe_float(self._value(row, ["dec", "DEC"], 0.0), 0.0)
-        err_maj = self._safe_float(self._value(row, ["coo_err_maj", "COO_ERR_MAJ"], 0.5) or 0.5, 0.5)
-        err_min = self._safe_float(self._value(row, ["coo_err_min", "COO_ERR_MIN"], 0.5) or 0.5, 0.5)
+        # Use _value with None default, let _safe_float handle conversion with proper fallback
+        # This avoids the "or 0.5" pattern which treats 0.0 as falsy and loses valid values
+        err_maj = self._safe_float(self._value(row, ["coo_err_maj", "COO_ERR_MAJ"], None), 0.5)
+        err_min = self._safe_float(self._value(row, ["coo_err_min", "COO_ERR_MIN"], None), 0.5)
         flux_v = self._value(row, ["flux", "FLUX"], None)
 
         photometry = []
@@ -550,7 +594,12 @@ class NedTapAdapter(CatalogConnector):
         if not normalized:
             return []
 
-        escaped_name = normalized.replace("'", "''")
+        try:
+            escaped_name = self._escape_adql_string(normalized)
+        except ValueError as exc:
+            logger.warning("Invalid object name for NED query: %s - %s", name, exc)
+            return []
+            
         adql = f"""
             SELECT TOP 1
                 prefname AS main_id,
@@ -567,19 +616,28 @@ class NedTapAdapter(CatalogConnector):
 
     @staticmethod
     def _value(row: Any, keys: List[str], default: Any = None) -> Any:
-        """Read first available key from TAP row using common key aliases."""
+        """Read first available key from TAP row using common key aliases.
+        
+        Attempts to access row using bracket notation, then attribute access,
+        and returns the first successfully retrieved value.
+        """
         for key in keys:
             value = None
             found = False
             try:
                 value = row[key]
                 found = True
-            except Exception:
+            except (KeyError, TypeError):
+                # KeyError: dict-like object doesn't have the key
+                # TypeError: object doesn't support item access
                 pass
 
             if not found and hasattr(row, key):
-                value = getattr(row, key)
-                found = True
+                try:
+                    value = getattr(row, key)
+                    found = True
+                except AttributeError:
+                    pass
 
             if found and value is not None:
                 return value

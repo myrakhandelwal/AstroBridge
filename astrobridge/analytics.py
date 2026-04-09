@@ -107,20 +107,23 @@ class AnalyticsStore:
                     )
                     conn.commit()
         else:
-            self._events.append(event)
+            # Even in non-persistent mode, protect list access with lock
+            with self._lock:
+                self._events.append(event)
         return event
 
     def clear(self) -> None:
-        self._events.clear()
-        if self.persist:
-            with self._lock:
+        with self._lock:
+            self._events.clear()
+            if self.persist:
                 with self._connect() as conn:
                     conn.execute("DELETE FROM analytics_events")
                     conn.commit()
 
     def list_events(self) -> List[AnalyticsEvent]:
         if not self.persist:
-            return list(self._events)
+            with self._lock:
+                return list(self._events)
 
         with self._lock:
             with self._connect() as conn:
