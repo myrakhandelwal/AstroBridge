@@ -1,14 +1,16 @@
 # AstroBridge
 
+**Version: 0.3.0** — Modern Python Packaging, Strict Type Safety, Production-Ready
+
 AstroBridge is a compact astronomical source matching pipeline that combines three pieces:
 
 * type-safe source models for catalogs and coordinates
 * intelligent query routing for catalog selection
-* Bayesian cross-matching for candidate association
+* Bayesian cross-matching for candidate association  
 
-The repository also includes an async orchestration layer and a runnable demo so new users can see the full flow quickly.
+The repository also includes async orchestration with bounded network concurrency, comprehensive quality gates, and a runnable demo for new users.
 
-Recent additions include confidence scoring for every match and optional proper-motion-aware epoch matching.
+Recent additions include confidence scoring for every match, optional proper-motion-aware epoch matching, and modern PEP 621 packaging with setuptools_scm automation.
 
 ## Quick Start
 
@@ -45,6 +47,31 @@ astrobridge-identify "Find nearby red dwarf stars"
 ```
 
 This prints the inferred object class, a short description of what it is, the suggested search radius, and the best starting catalogs.
+
+## Quality Gates & Type Safety
+
+**All checks passing** ✅
+
+```bash
+# Modern linting with Ruff
+ruff check .          # E, F, I, UP, B, SIM rules
+
+# Strict type checking on core modules  
+mypy astrobridge/     # Protocol-based typing, null safety
+
+# Complete test coverage
+pytest -q             # 148 tests passing, zero warnings
+```
+
+**Automated Versioning**  
+Versions are automatically derived from git tags using `setuptools_scm`. No manual version edits needed.
+
+```bash
+# To release a new version
+git tag -a v0.3.1 -m "Release message"
+git push --tags
+# Version auto-bumps at build time
+```
 
 ## Optional Web UI
 

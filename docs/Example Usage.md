@@ -7,9 +7,11 @@ This guide shows practical end-to-end usage patterns for AstroBridge.
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e .[dev]
 pytest -q
 ```
+
+Output: **148 passed** (all tests passing with zero warnings)
 
 ## 2. Run the full demo pipeline
 

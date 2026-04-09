@@ -322,7 +322,7 @@ if catalog_pm_ra and isinstance(catalog_pm_ra, str):
         pm_ra = None
 # ... error-prone
 
-# With Pydantic:
+# With Pydantic (type-checked at instantiation):
 coord = Coordinate(
     ra=123.456,
     dec=-45.678,
@@ -330,7 +330,52 @@ coord = Coordinate(
 )
 ```
 
----
+### Strict Type Checking (v0.3.0+)
+
+AstroBridge enforces **mypy strict mode** on core modules to catch bugs early:
+
+```bash
+# Type-check core modules with maximum strictness
+mypy --strict astrobridge/connectors.py
+mypy --strict astrobridge/api/orchestrator.py
+mypy --strict astrobridge/jobs.py
+```
+
+**Protocol-Based Typing**: Core interfaces use `typing.Protocol` for structural subtyping:
+
+```python
+# astrobridge/api/orchestrator.py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class MatcherProtocol(Protocol):
+    """Any object with this signature works as a matcher."""
+    def match(self, sources: list[Source]) -> list[MatchResult]:
+        """Match sources; must return list of results."""
+        ...
+
+# Any class matching this signature is compatible:
+class BayesianMatcher:
+    def match(self, sources: list[Source]) -> list[MatchResult]:
+        return [...]
+
+class CustomMatcher:
+    def match(self, sources: list[Source]) -> list[MatchResult]:
+        return [...]
+
+# Type-safe usage:
+def setup_orchestrator(matcher: MatcherProtocol) -> AstroBridgeOrchestrator:
+    orch = AstroBridgeOrchestrator()
+    orch.set_matcher(matcher)  # Type-checked by mypy
+    return orch
+```
+
+**Benefits**:
+- ✅ Null pointer exceptions caught at type-check time (not runtime)
+- ✅ Function argument types verified before execution
+- ✅ Optional types (`Optional[T]`) handled explicitly
+- ✅ Numpy array returns properly typed as `float` not `np.floating[Any]`
+- ✅ Protocol-based interfaces allow multiple implementations without inheritance
 
 ## Orchestration Pipeline
 
@@ -400,6 +445,53 @@ response = await orchestrator.execute_query(request)
 print(f"Sources: {len(response.sources)}")  # Gaia + NED results
 print(f"Matches: {len(response.matches)}")  # Cross-match of Gaia ↔ NED
 print(f"Errors: {response.errors}")         # ["simbad: timeout", "ned: parse error"]
+```
+
+### Bounded Async Concurrency
+
+**Problem**: Unbounded concurrent requests overwhelm TAP services and network resources.
+
+**Solution**: Live TAP adapters (`SimbadTapAdapter`, `NedTapAdapter`) use `asyncio.Semaphore` to bound parallelism:
+
+```python
+# In TAP adapters (v0.3.0+)
+class SimbadTapAdapter(CatalogConnector):
+    def __init__(self):
+        self._request_semaphore = asyncio.Semaphore(max_concurrency=8)  # ← Limits concurrent requests
+        self.request_timeout_sec = 10.0
+    
+    async def _run_io_bound(self, func, *args):
+        """Wrapper for network I/O with bounded concurrency."""
+        async with self._request_semaphore:  # ← Acquires slot or waits
+            return await asyncio.wait_for(
+                asyncio.to_thread(func, *args),  # ← Runs sync code in thread pool
+                timeout=self.request_timeout_sec,
+            )
+    
+    async def query_object(self, query: str, cone_search=None):
+        # Each TAP request acquires semaphore slot
+        # Max 8 concurrent network calls across all queries
+        results = await self._run_io_bound(
+            self._tap_service.search,
+            self._build_adql_query(query, cone_search),
+        )
+        return [self.parse_source(r) for r in results]
+```
+
+**Benefits**:
+- ✅ Prevents network exhaustion from 1000s of concurrent requests
+- ✅ TAP servers stay responsive (designed for ~10 concurrent clients)
+- ✅ Thread pool (default 32) handles I/O blocking efficiently
+- ✅ Timeout enforcement (10s default) prevents hanging queries
+
+**Production Default**: `max_concurrency=8` balances throughput and server courtesy. Adjust in custom adapters:
+
+```python
+# Higher concurrency for local catalogs
+self._request_semaphore = asyncio.Semaphore(max_concurrency=20)
+
+# Lower concurrency for rate-limited APIs
+self._request_semaphore = asyncio.Semaphore(max_concurrency=2)
 ```
 
 ---

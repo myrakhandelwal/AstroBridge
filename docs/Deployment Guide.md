@@ -70,40 +70,85 @@ source .venv/bin/activate  # macOS/Linux
 # -or-
 .venv\Scripts\activate     # Windows
 
-# Install in development mode
-pip install -e .[dev]      # Includes pytest, mypy, black
+# Install in development mode with PEP 621 pyproject.toml
+pip install -e .[dev]      # Includes pytest, mypy, ruff 
 pip install -e .[web]      # Optional: FastAPI + web UI
-pip install -e .[live]     # Optional: Live TAP adapters
+pip install -e .[live]     # Optional: Live TAP adapters (pyvo, etc)
 
 # Verify installation
 python -c "import astrobridge; print(f'AstroBridge {astrobridge.__version__}')"
 pytest --version
+ruff --version
+mypy --version
+```
+
+### Version Management
+
+**Automated via setuptools_scm**: Versions are derived from git tags. No manual version edits needed.
+
+```bash
+# Current stable version
+git tag  # Lists all tags, e.g., v0.3.0
+
+# To create a new release
+git tag -a v0.3.1 -m "Release message"
+git push --tags
+# Version auto-generates in _version.py at build time
 ```
 
 ### Development Workflow
 
 ```bash
 # Run tests
-pytest tests/ -v                 # All tests
+pytest tests/ -v                 # All 148 tests
 pytest tests/test_matcher.py -v  # Single test module
 
-# Type checking
-mypy astrobridge/
+# Modern linting with Ruff
+ruff check .                      # Lint checks (E, F, I, UP, B, SIM)
+ruff check . --fix                # Auto-fix violations
 
-# Code formatting
-black astrobridge/
-isort astrobridge/
+# Type checking (strict on core modules)
+mypy astrobridge/connectors.py    # Strict on core
+mypy astrobridge/                 # Relaxed on library modules
 
-# Run linter
-flake8 astrobridge/ --max-line-length=100
+# All quality gates at once
+ruff check . && mypy astrobridge && pytest -q
 
 # Run demo
-python demo.py
-
-# Run CLI
-astrobridge-demo
-astrobridge-identify "Proxima Centauri"
+python demo.py                    # End-to-end demo
+astrobridge-demo                  # Via entry point
 ```
+python demo.py                    # End-to-end demo
+astrobridge-demo                  # Via entry point
+```
+
+### CI/CD Pipeline
+
+**GitHub Actions** automates quality checks on every PR and push:
+
+```yaml
+# .github/workflows/ci.yml structure:
+1. Ruff lint checks (import sorting, type upgrades, style rules)
+2. Mypy strict type checking (core modules: connectors, orchestrator, jobs)
+3. Pytest full test suite (148 tests, async mode, 0 warnings)
+```
+
+**Local validation** before pushing:
+
+```bash
+# Run all checks locally (same as CI)
+ruff check . && mypy astrobridge && pytest -q
+
+# Auto-fix Ruff violations
+ruff check . --fix --unsafe
+
+# Check specific modules with strict mypy
+mypy --strict astrobridge/connectors.py
+mypy --strict astrobridge/api/orchestrator.py
+mypy --strict astrobridge/jobs.py
+```
+
+All commits must pass these gates. CI pipeline ensures production-ready code.
 
 ### Environment Variables
 
@@ -163,13 +208,13 @@ CMD ["astrobridge-web"]
 
 ```bash
 # Build image
-docker build -t astrobridge:0.2.0 .
+docker build -t astrobridge:0.3.0 .
 
 # Run container
 docker run \
   -p 8000:8000 \
   -v astrobridge_data:/data/astrobridge \
-  astrobridge:0.2.0
+  astrobridge:0.3.0
 
 # Access web UI
 open http://localhost:8000

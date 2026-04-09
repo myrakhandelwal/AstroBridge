@@ -32,16 +32,48 @@
 
 #### 4. **CI/Linting Pipeline**
 - New `.github/workflows/ci.yml` with full quality gates:
-  - Ruff linting (import sorting, type upgrades, style)
-  - Mypy strict type checking
-  - Full test suite (`pytest`)
-- 200+ code style violations auto-fixed
+  - **Ruff**: Import sorting, type upgrades, style (E, F, I, UP, B, SIM rules)
+  - **Mypy Strict**: Type checking on core modules (connectors, orchestrator, jobs)
+  - **Pytest**: Full test suite with async auto-mode
+- 200+ code style violations auto-fixed (283 violations fixed via auto-fix + unsafe)
+- All 148 tests passing with zero warnings
 
-#### 5. **Backward Compatibility**
+#### 5. **Automated Versioning with setuptools_scm**
+- Git tags drive all version strings (no manual edits needed)
+- Current stable: `v0.3.0` pinned via git tag
+- Development builds auto-generate version strings from git history
+- Future releases just require: `git tag -a vX.Y.Z && git push --tags`
+
+#### 6. **Backward Compatibility**
 - ✅ All 126 tests pass
 - ✅ Demo runs end-to-end successfully
 - ✅ Full API compatibility maintained
 - Drop-in replacement for v0.2.0
+
+### 🔄 Migration from v0.2.0 → v0.3.0
+
+All existing code is compatible. Key improvements for users:
+
+```bash
+# Installation remains the same
+pip install -e .[dev,web,live]
+
+# Demo auto-validates all functionality
+python demo.py
+
+# New quality gates available in CI/CD
+ruff check .      # Lint checks
+mypy astrobridge  # Type checks (strict on core modules)
+pytest            # All 148 tests pass
+```
+
+### 📋 Commit History (v0.3.0)
+
+- `5bde038` — fix: resolve strict typing issues and eliminate pytest warnings
+  - Fixed 36 mypy strict type errors across 8 modules
+  - Converted 2 sync tests to async in test_api.py
+  - Removed generated artifacts (astrobridge/_version.py, test db files)
+  - All quality gates passing: ruff ✓ mypy ✓ pytest ✓
 
 ---
 

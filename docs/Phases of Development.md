@@ -4,7 +4,14 @@
 
 AstroBridge is an intelligent astronomical source matching system that leverages Bayesian inference, natural language processing, and multi-catalog orchestration to seamlessly cross-reference astronomical sources across diverse catalogs.
 
-**Status**: Phases 1-6 Complete with 2026 hardening + web console updates | 106 Tests Passing (100%) | Production-Ready Architecture
+**Status**: **v0.3.0 — Modernized & Production-Ready** (April 9, 2026)
+- ✅ Modern PEP 621 packaging (pyproject.toml, setuptools_scm)
+- ✅ Strict type safety (mypy strict on core modules)
+- ✅ Modern linting (Ruff with 6 rule categories)
+- ✅ Bounded async concurrency (TAP adapters with Semaphore)
+- ✅ 148 tests passing (100% + zero warnings)
+- ✅ GitHub Actions CI/CD (ruff → mypy → pytest)
+- ✅ Automated versioning from git tags
 
 ---
 

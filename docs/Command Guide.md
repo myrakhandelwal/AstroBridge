@@ -396,6 +396,77 @@ curl -X POST http://127.0.0.1:8000/api/identify \
 
 ---
 
+## Modern Quality Gates (v0.3.0+)
+
+### Linting with Ruff
+
+Enforce code style and import organization:
+
+```bash
+# Check for violations
+ruff check .
+
+# Auto-fix violations  
+ruff check . --fix
+
+# Auto-fix unsafe violations (use with caution)
+ruff check . --fix --unsafe
+```
+
+**Rules enforced**:
+- `E` - PEP 8 style errors
+- `F` - Pyflakes (undefined variables, unused imports)
+- `I` - Import sorting (isort-compatible)
+- `UP` - Python syntax upgrades (to 3.9 idioms)
+- `B` - Bugbear (async errors, mutable defaults)
+- `SIM` - Simplify (reduce code complexity)
+
+### Type Checking with Mypy
+
+Strict type checking on core modules:
+
+```bash
+# Check core modules with strict mode
+mypy astrobridge/connectors.py
+mypy astrobridge/api/orchestrator.py
+mypy astrobridge/jobs.py
+
+# Check all modules (relaxed on libraries)
+mypy astrobridge/
+
+# Enable strict mode for maximum type safety
+mypy --strict astrobridge/connectors.py
+```
+
+**Type Safety Examples**:
+```python
+# ✓ Correct: Explicit Optional handling
+from typing import Optional
+def get_magnitude(source: Source) -> Optional[float]:
+    if source.photometry:
+        return source.photometry[0].magnitude
+    return None
+
+# ✗ Error: Missing Optional
+def get_magnitude(source: Source) -> float:  # mypy error: might be None
+    return source.photometry[0].magnitude
+```
+
+### CI/CD Pipeline
+
+Automated quality gates on every commit:
+
+```bash
+# GitHub Actions runs these checks (see .github/workflows/ci.yml):
+ruff check .          # Lint checks
+mypy astrobridge/     # Type checking
+pytest -q             # Full test suite (148 tests)
+
+# All must pass before merge
+```
+
+---
+
 ## Testing
 
 ### Run All Tests
@@ -407,7 +478,7 @@ pytest
 **Expected Output:**
 
 ```
-======================== 142 passed in 0.85s ========================
+======================== 148 passed in 1.05s ========================
 ```
 
 ### Run Specific Test Suite
@@ -455,10 +526,11 @@ open htmlcov/index.html
 | Web | 8 | HTTP endpoint testing and error handling |
 | Identification | 7 | Object classification and hints |
 | Persistence | 2 | SQLite state management |
-| Live Adapters | 8 | TAP service compatibility |
+| Live Adapters | 8 | TAP service compatibility and bounded concurrency |
 | Integration | 1 | Full pipeline testing |
 | Regression | 1 | Determinism validation |
-| Edge Cases | 21 | Boundary conditions and error cases |
+| Edge Cases | 29 | Boundary conditions, error cases, and async patterns |
+| **Total** | **148** | **Comprehensive coverage with zero warnings** |
 
 ---
 
