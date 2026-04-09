@@ -52,6 +52,30 @@ astrobridge-identify "Find nearby red dwarf stars"
 
 This prints the inferred object class, a short description of what it is, the suggested search radius, and the best starting catalogs.
 
+## Interactive Live Demo
+
+For hands-on exploration with live user input, run the interactive demo:
+
+```bash
+python interactive_demo.py
+```
+
+Or via entry point:
+
+```bash
+astrobridge-interactive
+```
+
+The interactive demo provides a menu-driven interface to:
+- **Query by object name** — Search for specific astronomical objects (Proxima Centauri, M31, etc.)
+- **Query by coordinates** — Cone search around RA/Dec position with custom radius
+- **Natural language queries** — Describe what you're looking for; router handles the rest
+- **Object identification** — Classify targets and get recommended catalogs
+- **Advanced matcher controls** — Test different confidence weighting profiles
+- **Performance benchmarking** — Measure query latency across iterations
+
+All queries use live connectors (if `[live]` is installed) or fall back to local synthetic data for teaching/testing.
+
 ## Quality Gates & Type Safety
 
 **All checks passing** ✅
@@ -247,71 +271,6 @@ API-level matcher controls are also available through `QueryRequest`:
 * `weighting_profile` (`balanced`, `position_first`, `photometry_first`)
 
 These are applied by the orchestrator before query execution so callers can tune matching behavior per request.
-
-## Recommendations for Next Version (v0.4.0+)
-
-### 1. **Upgrade Geometry to Spherical Distances**
-Currently using flat-sky Euclidean distance. Replace with proper **Haversine formula** or leverage **astropy.coordinates** for true spherical distance calculations on the celestial sphere. This improves accuracy for wide-area searches and high-precision astrometry.
-
-```python
-# Current: approximate flat-sky
-distance = sqrt((ra1 - ra2)^2 + (dec1 - dec2)^2)
-
-# Recommended: spherical (e.g., astropy)
-from astropy.coordinates import SkyCoord
-coord1 = SkyCoord(ra=ra1, dec=dec1, unit='deg')
-coord2 = SkyCoord(ra=ra2, dec=dec2, unit='deg')
-separation = coord1.separation(coord2)
-```
-
-### 2. **Fix Matcher Ambiguity with Probability Normalization**
-Implement strict probability conservation: sum of match probabilities for a single source across all candidates should not exceed 1.0. This requires "1-to-many" or "many-to-many" association logic with proper posterior normalization.
-
-```python
-# Current: independent pairwise matches (can sum to >1.0)
-P(match | source1 ↔ cand1) = 0.8
-P(match | source1 ↔ cand2) = 0.7  # Problem: sum = 1.5
-
-# Recommended: normalized posterior
-P(match | source1 ↔ cand1) = 0.53  # Normalized to sum = 1.0
-P(match | source1 ↔ cand2) = 0.47
-```
-
-### 3. **Enhance NLP with Semantic Embeddings**
-Move beyond keyword matching (`if "star" in query`) to true semantic intent recognition using lightweight embedding models like **sentence-transformers**. Compare query intent against catalog descriptions in embedding space for intelligent catalog selection.
-
-```python
-# Current: keyword-based routing
-if "red dwarf" in query:
-    return ["GAIA", "SIMBAD"]
-
-# Recommended: semantic embeddings
-embeddings = SentenceTransformer('all-MiniLM-L6-v2')
-query_embedding = embeddings.encode(query)
-catalog_similarities = {
-    cat: cosine_similarity(query_embedding, catalog_description_embedding)
-    for cat in CATALOGS
-}
-return sorted_by_similarity(catalog_similarities)
-```
-
-### 4. **Add OpenTelemetry for Production Observability**
-While `AnalyticsStore` provides basic event tracking, integrating **OpenTelemetry** support into the `Orchestrator` will greatly improve debugging of async I/O-bound threads in production. Enables distributed tracing across catalog services and TAP queries.
-
-```python
-# Recommended: OpenTelemetry integration
-from opentelemetry import trace, metrics
-from opentelemetry.sdk.trace import TracerProvider
-
-tracer = trace.get_tracer(__name__)
-
-async def execute_query(self, request):
-    with tracer.start_as_current_span("execute_query") as span:
-        span.set_attribute("query_type", request.query_type)
-        # ... trace async catalog queries, matches, scoring
-```
-
-These improvements will enhance scientific accuracy, probabilistic rigor, user experience, and operational visibility while maintaining backward compatibility.
 
 The web console includes these controls directly in the UI so users can run interactive experiments without writing Python code.
 
