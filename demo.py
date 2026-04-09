@@ -18,7 +18,10 @@ from astrobridge.jobs import JobManager, JobRecord
 from astrobridge.benchmarking import BenchmarkConfig, BenchmarkRunner
 
 
-class DemoConnector:
+from astrobridge.connectors import CatalogConnector
+
+
+class DemoConnector(CatalogConnector):
     """Synthetic connector used to keep the demo fully self-contained."""
 
     def __init__(self, catalog_name):
@@ -377,7 +380,34 @@ def main() -> None:
     """
     print("\n" + "="*70)
     print("  ASTROBRIDGE: AI-DRIVEN ASTRONOMICAL SOURCE MATCHING")
-    print("  Full Package Capability Demo")
+    async def query_object(self, coordinate, search_radius_arcsec):
+        """Async query method for API orchestration compatibility."""
+        offsets = {
+            "simbad": 0.0000,
+            "gaia": 0.0005,
+            "ned": 0.0010,
+            "sdss": -0.0004,
+            "wise": 0.0008,
+            "panstarrs": -0.0007,
+            "ztf": 0.0012,
+            "atlas": -0.0011,
+        }
+        
+        offset = offsets.get(self.catalog_name, 0.0)
+        
+        return [Source(
+            id=f"{self.catalog_name}:demo_object",
+            name="Demo Object",
+            coordinate=Coordinate(ra=coordinate.ra + offset, dec=coordinate.dec + offset),
+            uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
+            photometry=[Photometry(magnitude=11.05 + offset, band="V")],
+            provenance=Provenance(
+                catalog_name=self.catalog_name.upper(),
+                catalog_version="demo",
+                query_timestamp=datetime.now(),
+                source_id=f"{self.catalog_name.upper()}:DEMO",
+            ),
+        )]
     print("="*70)
     
     # Phase 2: Models
