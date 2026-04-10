@@ -331,10 +331,10 @@ class TestQueryExecution:
             def __init__(self):
                 self.cone_calls = 0
 
-            def query(self, name: str):
+            def query(self, name: str) -> None:
                 return None
 
-            async def cone_search(self, coordinate: Coordinate, radius_arcsec: float):
+            async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
                 self.cone_calls += 1
                 return [
                     Source(

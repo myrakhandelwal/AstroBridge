@@ -8,11 +8,11 @@ from astrobridge.connectors import NedTapAdapter, SimbadTapAdapter
 from astrobridge.models import Coordinate
 
 
-class FakeRow(dict):
+class FakeRow(dict[str, object]):
     """Simple row object matching minimal TAP row behavior."""
 
     @property
-    def colnames(self):
+    def colnames(self) -> list[str]:
         return list(self.keys())
 
 

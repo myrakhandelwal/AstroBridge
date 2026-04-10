@@ -71,6 +71,9 @@ ignore = ["UP045", "E501"]  # X | None syntax requires Python 3.10+ for 3.9; lin
 
 [tool.mypy]
 python_version = "3.9"
+plugins = ["pydantic.mypy"]
+disallow_untyped_defs = false
+disallow_untyped_calls = false
 warn_unused_configs = true
 warn_redundant_casts = true
 warn_unused_ignores = true
@@ -84,3 +87,23 @@ module = [
   "astrobridge.jobs"
 ]
 strict = true
+
+[[tool.mypy.overrides]]
+module = [
+  "test_api",
+  "test_confidence_scoring",
+  "test_edge_cases",
+  "test_identify",
+  "test_interactive_demo",
+  "test_live_adapters",
+  "test_matcher",
+  "test_matching_determinism",
+  "test_matching_pipeline",
+  "test_persistence",
+  "test_routing",
+  "test_web"
+]
+strict = false
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+check_untyped_defs = false
