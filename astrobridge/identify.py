@@ -9,6 +9,7 @@ from typing import Optional
 from astrobridge.routing import NLPQueryRouter
 from astrobridge.routing.base import CatalogType, ObjectClass
 from astrobridge.routing.intelligent import CatalogRanker
+from astrobridge.models import UnifiedObject
 
 OBJECT_DESCRIPTIONS: dict[ObjectClass, str] = {
     ObjectClass.STAR: "This looks like a stellar source: a point-like object such as a dwarf, giant, or binary star.",
@@ -182,6 +183,72 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print machine-readable JSON instead of formatted text",
     )
     return parser
+
+
+async def identify_from_catalogs(
+    input_text: str,
+    router: Optional[NLPQueryRouter] = None,
+    ai_description: bool = True,
+    timeout_sec: float = 10.0,
+) -> dict[str, object]:
+    """Identify a celestial object by querying live catalogs.
+
+    Combines NLP routing (to classify the query and rank catalogs) with a live
+    fan-out to SIMBAD and NED.  Returns a plain dict suitable for JSON responses.
+
+    Parameters
+    ----------
+    input_text :
+        Object name or natural-language query (e.g. ``"M31"``, ``"red dwarfs"``).
+    router :
+        Optional pre-built NLPQueryRouter; a default one is created if omitted.
+    ai_description :
+        If True, generate a plain-language description via ``ai_description.py``.
+    timeout_sec :
+        Per-catalog network timeout.
+
+    Returns
+    -------
+    dict with keys:
+        input_text, object_class, description, search_radius_arcsec,
+        top_catalogs, reasoning, catalog_data (UnifiedObject dict or None)
+    """
+    from astrobridge.lookup import lookup_object
+    from astrobridge.ai_description import generate_description
+
+    # 1. NLP classification (fast, no network)
+    base = identify_object(input_text, router=router)
+
+    # 2. Live catalog lookup
+    unified: Optional[UnifiedObject] = await lookup_object(input_text, timeout_sec=timeout_sec)
+
+    # 3. Build description
+    if unified is not None and ai_description:
+        description = generate_description(unified, conn=None)
+    else:
+        description = base.description
+
+    catalog_data: Optional[dict[str, object]] = None
+    if unified is not None:
+        catalog_data = {
+            "primary_name": unified.primary_name,
+            "ra": unified.ra,
+            "dec": unified.dec,
+            "object_type": unified.object_type,
+            "photometry": unified.photometry_summary,
+            "catalogs": list(unified.catalog_entries.keys()) if unified.catalog_entries else [],
+            "alternate_names": unified.alternate_names,
+        }
+
+    return {
+        "input_text": base.input_text,
+        "object_class": base.object_class.value,
+        "description": description,
+        "search_radius_arcsec": base.search_radius_arcsec,
+        "top_catalogs": base.top_catalogs,
+        "reasoning": base.reasoning,
+        "catalog_data": catalog_data,
+    }
 
 
 def main(argv: Optional[list[str]] = None) -> None:

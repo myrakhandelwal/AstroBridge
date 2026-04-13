@@ -7,16 +7,18 @@ Design
 * On a miss it builds a prompt, calls the configured LLM, stores the result,
   and returns it.
 * The LLM provider is selected via the ``AI_PROVIDER`` env variable
-  (``"openai"`` | ``"local"`` | ``"stub"``).
+  (``"anthropic"`` | ``"openai"`` | ``"local"`` | ``"stub"``).
 * API keys are read **only** from environment variables; they are never hard-
   coded or committed.
 
 Environment variables
 ---------------------
-AI_PROVIDER      : "openai" | "local" | "stub"  (default: "stub")
+AI_PROVIDER      : "anthropic" | "openai" | "local" | "stub"  (default: "stub")
 AI_API_KEY       : API key for the selected provider
-AI_MODEL         : Model name override (e.g. "gpt-4o-mini")
-AI_BASE_URL      : Override base URL for local / compatible endpoints
+AI_MODEL         : Model name override
+                   - anthropic default: "claude-haiku-4-5-20251001"
+                   - openai default:    "gpt-4o-mini"
+AI_BASE_URL      : Override base URL for local / OpenAI-compatible endpoints
 """
 
 from __future__ import annotations
@@ -94,6 +96,26 @@ def _call_openai(prompt: str, system: str, model: str, api_key: str, base_url: O
     return response.choices[0].message.content.strip()
 
 
+def _call_anthropic(prompt: str, system: str, model: str, api_key: str, _base: Optional[str]) -> str:
+    """Call the Anthropic Claude API."""
+    try:
+        import anthropic  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise RuntimeError(
+            "anthropic package is required for AI_PROVIDER=anthropic.  "
+            "Install with: pip install anthropic"
+        ) from exc
+
+    client = anthropic.Anthropic(api_key=api_key or None)
+    message = client.messages.create(
+        model=model,
+        max_tokens=256,
+        system=system,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return message.content[0].text.strip()
+
+
 def _call_stub(prompt: str, _system: str, _model: str, _key: str, _base: Optional[str]) -> str:
     """Return a deterministic placeholder (no network required)."""
     obj_line = next((l for l in prompt.splitlines() if l.startswith("Name:")), "")
@@ -109,9 +131,17 @@ def _call_stub(prompt: str, _system: str, _model: str, _key: str, _base: Optiona
 
 
 _BACKENDS = {
+    "anthropic": _call_anthropic,
     "openai": _call_openai,
     "local": _call_openai,   # same OpenAI-compatible interface, different base_url
     "stub": _call_stub,
+}
+
+_DEFAULT_MODELS = {
+    "anthropic": "claude-haiku-4-5-20251001",
+    "openai": "gpt-4o-mini",
+    "local": "stub",
+    "stub": "stub",
 }
 
 
@@ -178,7 +208,7 @@ def generate_description(
     provider = os.getenv("AI_PROVIDER", "stub").lower()
     backend = _BACKENDS.get(provider, _call_stub)
     api_key = os.getenv("AI_API_KEY", "")
-    model = os.getenv("AI_MODEL", "gpt-4o-mini" if provider == "openai" else "stub")
+    model = os.getenv("AI_MODEL", _DEFAULT_MODELS.get(provider, "stub"))
     base_url = os.getenv("AI_BASE_URL") or None
 
     # 3. Call LLM

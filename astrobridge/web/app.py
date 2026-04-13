@@ -12,7 +12,7 @@ from astrobridge.analytics import AnalyticsEvent, AnalyticsStore
 from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
 from astrobridge.benchmarking import BenchmarkConfig, BenchmarkRunner
 from astrobridge.connectors import CatalogConnector
-from astrobridge.identify import identify_object
+from astrobridge.identify import identify_from_catalogs, identify_object
 from astrobridge.jobs import JobManager
 from astrobridge.matching import BayesianMatcher
 from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty
@@ -364,11 +364,25 @@ async function runIdentify() {
     }
 
     setHtml("identifyStatus", `<span class='ok'>${data.object_class.toUpperCase()}</span> · ${data.search_radius_arcsec.toFixed(1)} arcsec`);
+    let catalogBlock = "";
+    if (data.catalog_data) {
+      const cd = data.catalog_data;
+      catalogBlock = `
+        <div class="panel" style="margin-top:10px">
+          <b>Live catalog match: ${cd.primary_name}</b>
+          <div class="meta mono">RA ${cd.ra.toFixed(5)}, Dec ${cd.dec.toFixed(5)}</div>
+          ${cd.object_type ? `<div class="meta">Type: ${cd.object_type}</div>` : ""}
+          ${cd.catalogs && cd.catalogs.length ? `<div class="meta">Found in: ${cd.catalogs.join(", ")}</div>` : ""}
+          ${cd.alternate_names && cd.alternate_names.length ? `<div class="meta">Also known as: ${cd.alternate_names.join(", ")}</div>` : ""}
+          ${cd.photometry ? `<div class="meta">Photometry: ${Object.entries(cd.photometry).map(([b,m]) => b+"="+m.toFixed(2)).join(", ")}</div>` : ""}
+        </div>`;
+    }
     setHtml("identifyResult", `
       <div><b>Input:</b> ${data.input_text}</div>
       <div style="margin-top:6px">${data.description}</div>
       <div class="meta" style="margin-top:6px">Top catalogs: ${data.top_catalogs.join(", ")}</div>
       <div class="meta">Reasoning: ${data.reasoning}</div>
+      ${catalogBlock}
     `);
   } catch (err) {
     setHtml("identifyStatus", `<span class='err'>ERROR</span>`);
@@ -413,7 +427,7 @@ async def run_query(request: QueryRequest) -> Any:
 @app.post("/api/identify")
 async def run_identify(request: IdentifyRequest) -> dict[str, Any]:
   try:
-    result = identify_object(request.input_text)
+    result = await identify_from_catalogs(request.input_text)
   except ValueError as exc:
     raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -424,19 +438,11 @@ async def run_identify(request: IdentifyRequest) -> dict[str, Any]:
       user_level=None,
       success=True,
       latency_ms=None,
-      catalog_count=None,
+      catalog_count=len(result.get("catalog_data", {}).get("catalogs", [])) if result.get("catalog_data") else None,
     )
   )
 
-  return {
-    "status": "success",
-    "input_text": result.input_text,
-    "object_class": result.object_class.value,
-    "description": result.description,
-    "search_radius_arcsec": result.search_radius_arcsec,
-    "top_catalogs": result.top_catalogs,
-    "reasoning": result.reasoning,
-  }
+  return {"status": "success", **result}
 
 
 @app.post("/api/jobs")
