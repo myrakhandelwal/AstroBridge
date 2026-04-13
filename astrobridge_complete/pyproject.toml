@@ -1,0 +1,114 @@
+[build-system]
+requires = ["setuptools>=69", "setuptools_scm[toml]>=7", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+write_to = "astrobridge/_version.py"
+write_to_template = "__version__ = '{version}'"
+fallback_version = "0.3.1"
+
+[project]
+name = "astrobridge"
+dynamic = ["version"]
+description = "Astronomical source matching and cross-catalog orchestration"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+  { name = "Myra Khandelwal" }
+]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12"
+]
+dependencies = [
+  "pydantic",
+  "pydantic-settings",
+  "numpy"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "mypy>=1.10",
+  "ruff>=0.5"
+]
+live = [
+  "pyvo>=1.5",
+  "astropy>=5.3",
+  "ccdproc>=2.4"
+]
+web = [
+  "fastapi>=0.111",
+  "uvicorn>=0.30",
+  "httpx>=0.27"
+]
+all = [
+  "astrobridge[live,web]"
+]
+
+[project.scripts]
+astrobridge-demo = "demo:main"
+astrobridge-identify = "astrobridge.identify:main"
+astrobridge-web = "astrobridge.web.app:main"
+astrobridge-interactive = "interactive_demo:main"
+
+[tool.setuptools]
+py-modules = ["demo", "interactive_demo"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["astrobridge*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+extend-exclude = ["astrobridge.egg-info"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["UP045", "E501"]  # X | None syntax requires Python 3.10+ for 3.9; line length is auto-formatted separately
+
+[tool.mypy]
+python_version = "3.9"
+plugins = ["pydantic.mypy"]
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+show_error_codes = true
+pretty = true
+
+[[tool.mypy.overrides]]
+module = [
+  "astrobridge.connectors",
+  "astrobridge.api.orchestrator",
+  "astrobridge.jobs"
+]
+strict = true
+
+[[tool.mypy.overrides]]
+module = [
+  "test_api",
+  "test_confidence_scoring",
+  "test_edge_cases",
+  "test_identify",
+  "test_interactive_demo",
+  "test_live_adapters",
+  "test_matcher",
+  "test_matching_determinism",
+  "test_matching_pipeline",
+  "test_persistence",
+  "test_routing",
+  "test_web"
+]
+strict = false
+disallow_untyped_defs = false
+disallow_untyped_calls = false
+check_untyped_defs = false
