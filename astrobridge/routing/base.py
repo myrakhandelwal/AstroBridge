@@ -14,14 +14,24 @@ class RouterError(Exception):
 
 class CatalogType(str, Enum):
     """Enumeration of available catalogs."""
-    SIMBAD = "simbad"
-    NED = "ned"
-    GAIA = "gaia"
-    SDSS = "sdss"
-    WISE = "wise"
-    PANSTARRS = "panstarrs"
-    ZTF = "ztf"
-    ATLAS = "atlas"
+    # General / multi-wavelength
+    SIMBAD = "simbad"          # CDS SIMBAD — comprehensive stellar/object DB
+    NED = "ned"                # NASA Extragalactic Database
+    VIZIER = "vizier"          # CDS VizieR — gateway to published catalog tables
+    # Optical / astrometry
+    GAIA = "gaia"              # ESA Gaia DR3 — best astrometry + proper motions
+    HIPPARCOS = "hipparcos"    # ESA Hipparcos — bright-star reference catalog
+    SDSS = "sdss"              # Sloan Digital Sky Survey
+    PANSTARRS = "panstarrs"    # Pan-STARRS1 3π survey
+    # Infrared
+    WISE = "wise"              # WISE W1–W4 mid-IR
+    ALLWISE = "allwise"        # AllWISE — improved WISE with proper motions
+    TWOMASS = "twomass"        # 2MASS J/H/Ks near-IR all-sky
+    # Time-domain / transients
+    ZTF = "ztf"                # Zwicky Transient Facility
+    ATLAS = "atlas"            # ATLAS survey
+    # Exoplanets
+    EXOPLANET_ARCHIVE = "exoplanet_archive"  # NASA Exoplanet Archive
 
 
 class ObjectClass(str, Enum):

@@ -88,7 +88,7 @@ ruff check .          # E, F, I, UP, B, SIM rules
 mypy astrobridge/     # Protocol-based typing, null safety
 
 # Complete test coverage
-pytest -q             # 221 tests passing, zero warnings
+pytest -q             # 261 tests passing, zero warnings
 ```
 
 **Automated Versioning**  
@@ -245,17 +245,46 @@ Key public classes/functions currently implemented:
 	CCD image reduction pipeline (bias, dark, flat); uses `astropy` + `ccdproc` when available, falls back to pure NumPy.
 
 11. `astrobridge.ai_description.generate_description`
-	LLM-backed plain-language object descriptions with SQLite caching.  Defaults to a deterministic stub; set `AI_PROVIDER=openai` and `AI_API_KEY` to enable live descriptions.
+	LLM-backed plain-language object descriptions with SQLite caching.  Defaults to a deterministic stub; set `AI_PROVIDER=anthropic` (or `openai`) and `AI_API_KEY` to enable live descriptions.
+
+12. `astrobridge.lookup.lookup_object`
+	Two-step live catalog fan-out: SIMBAD/NED resolve the name, then Gaia DR3 + 2MASS enrich with astrometry and multi-band photometry.  No local database required.
+
+13. `astrobridge.connectors.GaiaDR3TapAdapter`
+	Live Gaia DR3 cone-search adapter via ESA TAP.  Returns G/BP/RP photometry and proper motions.
+
+14. `astrobridge.connectors.TwoMassTapAdapter`
+	Live 2MASS Point Source Catalog adapter via NASA IRSA TAP.  Returns J/H/Ks photometry.
 
 ## What You Get
 
-* [astrobridge.models](astrobridge/models.py) for `Source`, `Coordinate`, `Uncertainty`, `Photometry`, `Provenance`, and `UnifiedObject`
-* [astrobridge.routing](astrobridge/routing) for natural-language query routing
-* [astrobridge.matching](astrobridge/matching) for probabilistic source matching
-* [astrobridge.api](astrobridge/api) for request and response schemas plus orchestration
-* [astrobridge.database](astrobridge/database.py) for SQLite-backed persistence (objects, catalog sources, calibration frames)
-* [astrobridge.ccd_calibration](astrobridge/ccd_calibration.py) for CCD image reduction (bias/dark/flat)
-* [astrobridge.ai_description](astrobridge/ai_description.py) for LLM-generated object description with caching
+* [astrobridge.models](astrobridge/models.py) — `Source`, `Coordinate`, `Uncertainty`, `Photometry`, `Provenance`, `UnifiedObject`
+* [astrobridge.routing](astrobridge/routing) — NLP query routing across 13 catalog types
+* [astrobridge.matching](astrobridge/matching) — Bayesian probabilistic source matching
+* [astrobridge.api](astrobridge/api) — orchestration, request/response schemas
+* [astrobridge.lookup](astrobridge/lookup.py) — live two-step catalog fan-out (no database required)
+* [astrobridge.connectors](astrobridge/connectors.py) — live TAP adapters: SIMBAD, NED, Gaia DR3, 2MASS
+* [astrobridge.database](astrobridge/database.py) — SQLite-backed persistence (objects, catalog sources, calibration frames)
+* [astrobridge.ccd_calibration](astrobridge/ccd_calibration.py) — CCD image reduction (bias/dark/flat)
+* [astrobridge.ai_description](astrobridge/ai_description.py) — LLM-generated descriptions (`anthropic` | `openai` | `stub`)
+
+## Supported Catalogs
+
+| Catalog | Type | Live adapter | Object types |
+|---------|------|-------------|--------------|
+| SIMBAD | General | `SimbadTapAdapter` | All |
+| NED | Extragalactic | `NedTapAdapter` | Galaxies, QSOs, AGN |
+| Gaia DR3 | Astrometry | `GaiaDR3TapAdapter` | Stars, clusters |
+| 2MASS | Near-IR | `TwoMassTapAdapter` | Stars, galaxies |
+| SDSS | Optical | routing only | Stars, galaxies, QSOs |
+| PanSTARRS | Optical | routing only | Stars, SNe, galaxies |
+| WISE | Mid-IR | routing only | All |
+| AllWISE | Mid-IR | routing only | AGN, galaxies |
+| ZTF | Time-domain | routing only | Transients, SNe, variables |
+| ATLAS | Time-domain | routing only | SNe, variables |
+| Hipparcos | Astrometry | routing only | Bright stars |
+| VizieR | General | routing only | All |
+| NASA Exoplanet Archive | Exoplanets | routing only | Exoplanet hosts |
 
 ## Matching Features
 
@@ -310,50 +339,57 @@ AstroBridge is licensed under the MIT License. See [LICENSE](LICENSE).
 
 Simbad and NED currently use deterministic local datasets for fast, reliable development and CI validation.
 
-## Live SIMBAD TAP Adapter
+## Live Catalog Adapters
 
-SIMBAD exposes a TAP service, and AstroBridge includes a live adapter for it: `SimbadTapAdapter` in [astrobridge/connectors.py](astrobridge/connectors.py).
-AstroBridge also includes `NedTapAdapter` for NED TAP-style access in the same module.
+AstroBridge includes live TAP adapters for four catalogs.  All require `pyvo` (install with `pip install -e .[live]`).
 
-Install live adapter dependency:
+| Adapter | Catalog | Name lookup | Cone search | TAP endpoint |
+|---------|---------|-------------|-------------|--------------|
+| `SimbadTapAdapter` | CDS SIMBAD | ✅ | ✅ | `simbad.cds.unistra.fr` |
+| `NedTapAdapter` | NASA NED | ✅ | ✅ | `ned.ipac.caltech.edu` |
+| `GaiaDR3TapAdapter` | ESA Gaia DR3 | — | ✅ | `gea.esac.esa.int` |
+| `TwoMassTapAdapter` | 2MASS PSC via IRSA | — | ✅ | `irsa.ipac.caltech.edu` |
+
+Gaia DR3 and 2MASS do not have a human-readable name index.  `lookup_object()` automatically uses a **two-step strategy**: SIMBAD/NED resolve the name to a position, then Gaia DR3 and 2MASS cone-search around that position for multi-wavelength enrichment.
 
 ```bash
 pip install -e .[live]
 ```
 
-Example usage:
-
 ```python
 import asyncio
-from astrobridge.connectors import SimbadTapAdapter
-from astrobridge.models import Coordinate
+from astrobridge.lookup import lookup_object
 
 async def main():
-	adapter = SimbadTapAdapter()
-
-	by_name = await adapter.query_object("Prox Cen")
-	print("name hits:", len(by_name))
-
-	around = await adapter.cone_search(
-		Coordinate(ra=217.429, dec=-62.680),
-		radius_arcsec=60,
-	)
-	print("cone hits:", len(around))
+    obj = await lookup_object("Proxima Centauri")
+    if obj:
+        print(obj.primary_name, obj.ra, obj.dec)
+        print("catalogs:", list(obj.catalog_entries.keys()))
+        print("photometry:", obj.photometry_summary)
 
 asyncio.run(main())
 ```
 
-NED adapter usage follows the same shape:
+Direct adapter usage:
 
 ```python
-from astrobridge.connectors import NedTapAdapter
+from astrobridge.connectors import SimbadTapAdapter, GaiaDR3TapAdapter
+from astrobridge.models import Coordinate
 
-adapter = NedTapAdapter()
+async def main():
+    # Name lookup — SIMBAD
+    simbad = SimbadTapAdapter()
+    hits = await simbad.query_object("M31")
+    print("SIMBAD hits:", len(hits))
+
+    # Positional enrichment — Gaia DR3
+    gaia = GaiaDR3TapAdapter()
+    coord = Coordinate(ra=10.685, dec=41.269)
+    stars = await gaia.cone_search(coord, radius_arcsec=30)
+    print("Gaia stars:", len(stars))
+
+asyncio.run(main())
 ```
-
-Default TAP endpoint used:
-- `https://simbad.cds.unistra.fr/simbad/sim-tap`
-- `https://ned.ipac.caltech.edu/tap`
 
 ## Test Coverage For Adapter Steps
 
@@ -370,7 +406,7 @@ Current live-adapter unit coverage is in [tests/test_live_adapters.py](tests/tes
 
 ## Status
 
-The repository currently passes its full test suite (221/221) in the default virtual environment when the dev dependencies are installed.
+The repository currently passes its full test suite (261/261) in the default virtual environment when the dev dependencies are installed.
 
 ## Handoff Notes
 

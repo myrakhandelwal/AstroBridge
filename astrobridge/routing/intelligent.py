@@ -14,90 +14,151 @@ class CatalogRanker:
     # Catalog strengths by object type
     CATALOG_STRENGTHS = {
         ObjectClass.STAR: {
-            CatalogType.GAIA: 0.95,          # Astrometry champion
-            CatalogType.SIMBAD: 0.90,        # Comprehensive stellar data
-            CatalogType.SDSS: 0.75,          # Good photometry
-            CatalogType.PANSTARRS: 0.70,     # Multi-epoch imaging
-            CatalogType.ZTF: 0.60,           # Variable stars
-            CatalogType.NED: 0.20,           # Not designed for stars
-            CatalogType.WISE: 0.50,          # Infrared photometry
+            CatalogType.GAIA: 0.95,              # Astrometry champion + proper motions
+            CatalogType.SIMBAD: 0.90,            # Comprehensive stellar data
+            CatalogType.HIPPARCOS: 0.85,         # Bright-star reference (V < 12)
+            CatalogType.TWOMASS: 0.80,           # NIR magnitudes for all stars
+            CatalogType.SDSS: 0.75,              # Good optical photometry
+            CatalogType.PANSTARRS: 0.70,         # Multi-epoch imaging
+            CatalogType.ZTF: 0.60,               # Variable stars
+            CatalogType.NED: 0.20,               # Not designed for stars
+            CatalogType.WISE: 0.50,              # Mid-IR photometry
+            CatalogType.ALLWISE: 0.55,           # AllWISE improves WISE for stars
+            CatalogType.ATLAS: 0.45,             # Alert stream for variables
+            CatalogType.VIZIER: 0.65,            # VizieR hosts many stellar catalogs
+            CatalogType.EXOPLANET_ARCHIVE: 0.30, # Stellar hosts only
         },
         ObjectClass.GALAXY: {
-            CatalogType.NED: 0.95,           # Galaxy database
-            CatalogType.SDSS: 0.85,          # Large photometric survey
-            CatalogType.SIMBAD: 0.70,        # Bright galaxies
-            CatalogType.WISE: 0.75,          # Infrared selected
-            CatalogType.PANSTARRS: 0.60,     # Optical photometry
-            CatalogType.GAIA: 0.30,          # Not focus of Gaia
-            CatalogType.ZTF: 0.40,           # Variable galaxies/AGN
+            CatalogType.NED: 0.95,               # Galaxy database
+            CatalogType.SDSS: 0.85,              # Large photometric survey
+            CatalogType.WISE: 0.75,              # Infrared selected
+            CatalogType.ALLWISE: 0.78,           # Better coverage than WISE alone
+            CatalogType.SIMBAD: 0.70,            # Bright galaxies
+            CatalogType.PANSTARRS: 0.60,         # Optical photometry
+            CatalogType.GAIA: 0.30,              # Not primary focus
+            CatalogType.ZTF: 0.40,               # Variable galaxies/AGN
+            CatalogType.TWOMASS: 0.60,           # NIR for nearby galaxies
+            CatalogType.VIZIER: 0.65,            # RC3, HyperLEDA etc.
+            CatalogType.HIPPARCOS: 0.05,         # Irrelevant
+            CatalogType.ATLAS: 0.30,
+            CatalogType.EXOPLANET_ARCHIVE: 0.05,
         },
         ObjectClass.QUASAR: {
-            CatalogType.NED: 0.90,           # Quasar catalog
-            CatalogType.SDSS: 0.85,          # SDSS quasars
-            CatalogType.WISE: 0.80,          # Infrared-selected QSOs
-            CatalogType.ZTF: 0.70,           # Variable QSOs
-            CatalogType.PANSTARRS: 0.65,     # Multi-color QSOs
-            CatalogType.SIMBAD: 0.60,        # Bright QSOs
-            CatalogType.GAIA: 0.30,          # Most too faint
+            CatalogType.NED: 0.90,               # Quasar catalog
+            CatalogType.SDSS: 0.85,              # SDSS quasar survey
+            CatalogType.WISE: 0.80,              # Infrared-selected QSOs
+            CatalogType.ALLWISE: 0.82,           # Better for high-z QSOs
+            CatalogType.ZTF: 0.70,               # Variable QSOs
+            CatalogType.PANSTARRS: 0.65,         # Multi-color QSOs
+            CatalogType.SIMBAD: 0.60,            # Bright QSOs
+            CatalogType.GAIA: 0.30,              # Most too faint
+            CatalogType.VIZIER: 0.70,            # SDSS QSO catalogs on VizieR
+            CatalogType.TWOMASS: 0.35,
+            CatalogType.HIPPARCOS: 0.05,
+            CatalogType.ATLAS: 0.40,
+            CatalogType.EXOPLANET_ARCHIVE: 0.05,
         },
         ObjectClass.AGN: {
-            CatalogType.NED: 0.92,           # AGN catalog
-            CatalogType.WISE: 0.88,          # Infrared AGN
-            CatalogType.SDSS: 0.80,          # AGN survey
-            CatalogType.ZTF: 0.75,           # Variable AGN
-            CatalogType.PANSTARRS: 0.65,     # Optical AGN
-            CatalogType.SIMBAD: 0.55,        # AGN subset
-            CatalogType.GAIA: 0.25,          # Most too faint
+            CatalogType.NED: 0.92,               # AGN catalog
+            CatalogType.WISE: 0.88,              # Infrared AGN selection
+            CatalogType.ALLWISE: 0.90,           # AllWISE AGN colors
+            CatalogType.SDSS: 0.80,              # AGN spectroscopic survey
+            CatalogType.ZTF: 0.75,               # Variable AGN
+            CatalogType.PANSTARRS: 0.65,         # Optical AGN
+            CatalogType.SIMBAD: 0.55,            # AGN subset
+            CatalogType.GAIA: 0.25,              # Most AGN too faint
+            CatalogType.VIZIER: 0.60,
+            CatalogType.TWOMASS: 0.40,
+            CatalogType.HIPPARCOS: 0.05,
+            CatalogType.ATLAS: 0.45,
+            CatalogType.EXOPLANET_ARCHIVE: 0.05,
         },
         ObjectClass.NEBULA: {
-            CatalogType.SIMBAD: 0.90,        # Emission nebulae
-            CatalogType.PANSTARRS: 0.75,     # Nearby nebulae
-            CatalogType.WISE: 0.70,          # Infrared nebulae
-            CatalogType.SDSS: 0.60,          # In survey areas
-            CatalogType.GAIA: 0.50,          # Dust extinction
-            CatalogType.NED: 0.40,           # HII regions
-            CatalogType.ZTF: 0.30,           # Transient detection
+            CatalogType.SIMBAD: 0.90,            # Emission nebulae
+            CatalogType.PANSTARRS: 0.75,         # Nearby nebulae
+            CatalogType.WISE: 0.70,              # Infrared nebulae
+            CatalogType.ALLWISE: 0.72,
+            CatalogType.SDSS: 0.60,              # In survey areas
+            CatalogType.GAIA: 0.50,              # Background stars / dust
+            CatalogType.NED: 0.40,               # HII regions
+            CatalogType.ZTF: 0.30,               # Transient detection
+            CatalogType.TWOMASS: 0.55,           # Infrared nebulae
+            CatalogType.VIZIER: 0.60,
+            CatalogType.HIPPARCOS: 0.10,
+            CatalogType.ATLAS: 0.20,
+            CatalogType.EXOPLANET_ARCHIVE: 0.05,
         },
         ObjectClass.CLUSTER: {
-            CatalogType.GAIA: 0.85,          # Stellar kinematics
-            CatalogType.SIMBAD: 0.85,        # Cluster database
-            CatalogType.PANSTARRS: 0.75,     # Cluster members
-            CatalogType.SDSS: 0.70,          # Globular clusters
-            CatalogType.WISE: 0.50,          # Infrared clusters
-            CatalogType.NED: 0.40,           # Galaxy clusters
-            CatalogType.ZTF: 0.30,           # No cluster focus
+            CatalogType.GAIA: 0.95,              # Best for cluster membership
+            CatalogType.SIMBAD: 0.85,            # Cluster database
+            CatalogType.HIPPARCOS: 0.75,         # Bright open clusters
+            CatalogType.PANSTARRS: 0.75,         # Cluster member photometry
+            CatalogType.SDSS: 0.70,              # Globular clusters in footprint
+            CatalogType.TWOMASS: 0.70,           # NIR cluster studies
+            CatalogType.WISE: 0.50,              # Infrared clusters
+            CatalogType.ALLWISE: 0.52,
+            CatalogType.NED: 0.40,               # Galaxy clusters
+            CatalogType.ZTF: 0.30,
+            CatalogType.VIZIER: 0.65,
+            CatalogType.ATLAS: 0.25,
+            CatalogType.EXOPLANET_ARCHIVE: 0.05,
         },
         ObjectClass.SNE: {
-            CatalogType.ZTF: 0.95,           # Active supernova monitoring
-            CatalogType.PANSTARRS: 0.85,     # SN discovery
-            CatalogType.SDSS: 0.70,          # Historical SNe
-            CatalogType.WISE: 0.50,          # Infrared SNe
-            CatalogType.SIMBAD: 0.60,        # SN locations
-            CatalogType.NED: 0.55,           # Host galaxies
-            CatalogType.GAIA: 0.30,          # Astrometry
+            CatalogType.ZTF: 0.95,               # Active SN monitoring
+            CatalogType.PANSTARRS: 0.85,         # SN discovery survey
+            CatalogType.ATLAS: 0.80,             # ATLAS SN alerts
+            CatalogType.SDSS: 0.70,              # Historical SNe
+            CatalogType.WISE: 0.50,              # Infrared SNe
+            CatalogType.ALLWISE: 0.50,
+            CatalogType.SIMBAD: 0.60,            # SN locations
+            CatalogType.NED: 0.55,               # Host galaxies
+            CatalogType.GAIA: 0.30,
+            CatalogType.TWOMASS: 0.35,
+            CatalogType.VIZIER: 0.50,
+            CatalogType.HIPPARCOS: 0.05,
+            CatalogType.EXOPLANET_ARCHIVE: 0.05,
         },
         ObjectClass.UNKNOWN: {
-            # When classification is uncertain, use balanced approach
-            CatalogType.SIMBAD: 0.80,        # Most comprehensive
-            CatalogType.NED: 0.70,           # Extragalactic objects
-            CatalogType.GAIA: 0.75,          # Accurate positions
-            CatalogType.SDSS: 0.65,          # Large photometric survey
-            CatalogType.PANSTARRS: 0.60,     # Multi-epoch
-            CatalogType.WISE: 0.50,          # Infrared fallback
-            CatalogType.ZTF: 0.40,           # Transient detection
-        }
+            CatalogType.SIMBAD: 0.80,            # Most comprehensive
+            CatalogType.NED: 0.70,               # Extragalactic objects
+            CatalogType.GAIA: 0.75,              # Accurate positions
+            CatalogType.SDSS: 0.65,              # Large photometric survey
+            CatalogType.PANSTARRS: 0.60,         # Multi-epoch
+            CatalogType.WISE: 0.50,              # Infrared fallback
+            CatalogType.ALLWISE: 0.52,
+            CatalogType.ZTF: 0.40,               # Transient detection
+            CatalogType.TWOMASS: 0.55,           # NIR fallback
+            CatalogType.VIZIER: 0.60,
+            CatalogType.HIPPARCOS: 0.30,
+            CatalogType.ATLAS: 0.35,
+            CatalogType.EXOPLANET_ARCHIVE: 0.20,
+        },
     }
-    
+
     # Strength modifiers by query properties
     PROPERTY_MODIFIERS = {
-        "wavelength_ir": {CatalogType.WISE: 0.15, CatalogType.SDSS: -0.10},
+        "wavelength_ir": {
+            CatalogType.WISE: 0.15, CatalogType.ALLWISE: 0.15,
+            CatalogType.TWOMASS: 0.10, CatalogType.SDSS: -0.10,
+        },
         "wavelength_uv": {CatalogType.PANSTARRS: 0.10, CatalogType.SDSS: 0.10},
-        "wavelength_radio": {CatalogType.NED: 0.15},
-        "variability": {CatalogType.ZTF: 0.20, CatalogType.PANSTARRS: 0.10},
+        "wavelength_radio": {CatalogType.NED: 0.15, CatalogType.VIZIER: 0.10},
+        "variability": {
+            CatalogType.ZTF: 0.20, CatalogType.PANSTARRS: 0.10,
+            CatalogType.ATLAS: 0.15,
+        },
         "high_redshift": {CatalogType.NED: 0.15, CatalogType.SDSS: 0.10},
-        "nearby": {CatalogType.GAIA: 0.15, CatalogType.PANSTARRS: 0.10},
+        "nearby": {
+            CatalogType.GAIA: 0.15, CatalogType.HIPPARCOS: 0.15,
+            CatalogType.PANSTARRS: 0.10, CatalogType.TWOMASS: 0.05,
+        },
         "faint": {CatalogType.SDSS: 0.05, CatalogType.WISE: 0.10},
-        "bright": {CatalogType.GAIA: 0.10, CatalogType.SIMBAD: 0.10},
+        "bright": {
+            CatalogType.GAIA: 0.10, CatalogType.SIMBAD: 0.10,
+            CatalogType.HIPPARCOS: 0.15,
+        },
+        "exoplanet": {CatalogType.EXOPLANET_ARCHIVE: 0.40, CatalogType.GAIA: 0.10},
+        "nir": {CatalogType.TWOMASS: 0.20, CatalogType.ALLWISE: 0.10},
     }
     
     @staticmethod
@@ -292,7 +353,15 @@ class NLPQueryRouter(QueryRouter):
             props["bright"] = True
         if any(f in query_lower for f in ["faint", "mag > 20", "magnitude >", "v > 20"]):
             props["faint"] = True
-        
+
+        # Exoplanet indicators
+        if any(e in query_lower for e in ["exoplanet", "planet", "transit", "hot jupiter", "tess", "kepler"]):
+            props["exoplanet"] = True
+
+        # Near-infrared indicators
+        if any(n in query_lower for n in ["2mass", "j-band", "h-band", "k-band", "ks", "near-ir", "nir"]):
+            props["nir"] = True
+
         return props
     
     def _estimate_search_radius(self, query: str, object_class: ObjectClass) -> float:
