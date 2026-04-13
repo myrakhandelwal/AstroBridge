@@ -88,7 +88,7 @@ ruff check .          # E, F, I, UP, B, SIM rules
 mypy astrobridge/     # Protocol-based typing, null safety
 
 # Complete test coverage
-pytest -q             # 148 tests passing, zero warnings
+pytest -q             # 221 tests passing, zero warnings
 ```
 
 **Automated Versioning**  
@@ -238,12 +238,24 @@ Key public classes/functions currently implemented:
 8. `astrobridge.benchmarking.BenchmarkRunner`
 	Reproducible latency/success benchmark execution.
 
+9. `astrobridge.database`
+	SQLite persistence layer: `objects`, `catalog_sources`, and `calibration_frames` tables with full CRUD helpers.
+
+10. `astrobridge.ccd_calibration.calibrate_ccd`
+	CCD image reduction pipeline (bias, dark, flat); uses `astropy` + `ccdproc` when available, falls back to pure NumPy.
+
+11. `astrobridge.ai_description.generate_description`
+	LLM-backed plain-language object descriptions with SQLite caching.  Defaults to a deterministic stub; set `AI_PROVIDER=openai` and `AI_API_KEY` to enable live descriptions.
+
 ## What You Get
 
-* [astrobridge.models](astrobridge/models.py) for `Source`, `Coordinate`, `Uncertainty`, `Photometry`, and `Provenance`
+* [astrobridge.models](astrobridge/models.py) for `Source`, `Coordinate`, `Uncertainty`, `Photometry`, `Provenance`, and `UnifiedObject`
 * [astrobridge.routing](astrobridge/routing) for natural-language query routing
 * [astrobridge.matching](astrobridge/matching) for probabilistic source matching
 * [astrobridge.api](astrobridge/api) for request and response schemas plus orchestration
+* [astrobridge.database](astrobridge/database.py) for SQLite-backed persistence (objects, catalog sources, calibration frames)
+* [astrobridge.ccd_calibration](astrobridge/ccd_calibration.py) for CCD image reduction (bias/dark/flat)
+* [astrobridge.ai_description](astrobridge/ai_description.py) for LLM-generated object description with caching
 
 ## Matching Features
 
@@ -358,7 +370,7 @@ Current live-adapter unit coverage is in [tests/test_live_adapters.py](tests/tes
 
 ## Status
 
-The repository currently passes its full test suite (98/98) in the default virtual environment when the dev dependencies are installed.
+The repository currently passes its full test suite (221/221) in the default virtual environment when the dev dependencies are installed.
 
 ## Handoff Notes
 

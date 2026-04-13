@@ -1,6 +1,6 @@
 """Data models for astronomical sources."""
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -48,6 +48,55 @@ class Source(BaseModel):
     uncertainty: Uncertainty = Field(..., description="Position uncertainty")
     photometry: list[Photometry] = Field(default_factory=list, description="Photometric data")
     provenance: Provenance = Field(..., description="Source provenance")
+
+
+class UnifiedObject(BaseModel):
+    """A merged view of the same astronomical object across multiple catalogs."""
+
+    primary_name: str = Field(..., description="Best-effort display name for the object")
+    ra: float = Field(..., description="Right ascension in degrees")
+    dec: float = Field(..., description="Declination in degrees")
+    object_type: Optional[str] = Field(None, description="Inferred object type string")
+    photometry_summary: Optional[dict[str, float]] = Field(
+        None, description="Band → magnitude mapping merged across catalogs"
+    )
+    catalog_entries: Optional[dict[str, Any]] = Field(
+        None, description="Catalog name → dict of basic source info"
+    )
+    alternate_names: list[str] = Field(
+        default_factory=list, description="Other names from contributing sources"
+    )
+
+    @classmethod
+    def from_sources(cls, sources: list["Source"]) -> "UnifiedObject":
+        """Build a UnifiedObject by merging a cluster of co-located Sources."""
+        if not sources:
+            raise ValueError("Cannot build UnifiedObject from empty source list")
+
+        primary = sources[0]
+        photometry_summary: dict[str, float] = {}
+        catalog_entries: dict[str, Any] = {}
+        alternate_names: list[str] = []
+
+        for src in sources:
+            for phot in src.photometry:
+                photometry_summary.setdefault(phot.band, phot.magnitude)
+            catalog_entries[src.provenance.catalog_name] = {
+                "id": src.id,
+                "ra": src.coordinate.ra,
+                "dec": src.coordinate.dec,
+            }
+            if src.name != primary.name and src.name not in alternate_names:
+                alternate_names.append(src.name)
+
+        return cls(
+            primary_name=primary.name,
+            ra=primary.coordinate.ra,
+            dec=primary.coordinate.dec,
+            photometry_summary=photometry_summary or None,
+            catalog_entries=catalog_entries or None,
+            alternate_names=alternate_names,
+        )
 
 
 class MatchResult(BaseModel):
