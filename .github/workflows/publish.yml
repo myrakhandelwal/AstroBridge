@@ -6,37 +6,59 @@ on:
       - 'v*'
   workflow_dispatch:
 
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[dev,web,live]"
 
-      - name: Run quality gates
-        run: |
-          python -m pytest -q
-          python -m mypy --no-incremental astrobridge tests
+      - name: Lint
+        run: ruff check .
+
+      - name: Type check
+        run: mypy astrobridge/connectors.py astrobridge/api/orchestrator.py astrobridge/jobs.py
+
+      - name: Tests
+        run: pytest -q
+
+  publish:
+    name: Build and publish to PyPI
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # needed for setuptools_scm to derive version from tags
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
 
       - name: Install build tools
-        run: python -m pip install --upgrade build twine
+        run: python -m pip install --upgrade pip build
 
       - name: Build distributions
         run: python -m build
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@v1.12.3
         with:
           password: ${{ secrets.PYPI_API_TOKEN }}
