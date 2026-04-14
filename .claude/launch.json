@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "AstroBridge Web Console",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "astrobridge.web.app"],
+      "port": 8000
+    },
+    {
+      "name": "AstroBridge Demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["demo.py"],
+      "port": null
+    },
+    {
+      "name": "AstroBridge Interactive Demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["interactive_demo.py"],
+      "port": null
+    }
+  ]
+}
