@@ -1,8 +1,9 @@
 # AstroBridge
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/myrakhandelwal/AstroBridge/blob/main/LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Status: Stable](https://img.shields.io/badge/status-stable-green.svg)](#)
+[![Status: Stable](https://img.shields.io/badge/status-stable-green.svg)](https://github.com/myrakhandelwal/AstroBridge)
+[![GitHub](https://img.shields.io/badge/github-myrakhandelwal%2FAstroBridge-blue.svg)](https://github.com/myrakhandelwal/AstroBridge)
 
 **Version: 0.3.0** — Modern Python Packaging, Strict Type Safety, Production-Ready
 
