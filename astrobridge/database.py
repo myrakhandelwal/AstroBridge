@@ -12,7 +12,7 @@ import logging
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ def upsert_object(
 
 def get_object(
     conn: sqlite3.Connection, obj_id: str
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     """Fetch a single object row by primary key."""
     row = conn.execute(
         "SELECT * FROM objects WHERE id = ?", (obj_id,)
@@ -135,7 +135,7 @@ def get_object(
 
 def get_object_by_name(
     conn: sqlite3.Connection, name: str
-) -> Optional[Dict[str, Any]]:
+) -> Optional[dict[str, Any]]:
     """Case-insensitive name lookup."""
     row = conn.execute(
         "SELECT * FROM objects WHERE LOWER(primary_name) = LOWER(?)", (name,)
@@ -162,7 +162,7 @@ def insert_catalog_source(
     conn: sqlite3.Connection,
     object_id: str,
     catalog_name: str,
-    source_data: Dict[str, Any],
+    source_data: dict[str, Any],
 ) -> None:
     """Persist a raw catalog record linked to an object."""
     conn.execute(
@@ -182,7 +182,7 @@ def insert_catalog_source(
 
 def get_catalog_sources(
     conn: sqlite3.Connection, object_id: str
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Return all catalog entries linked to an object."""
     rows = conn.execute(
         "SELECT * FROM catalog_sources WHERE object_id = ? ORDER BY queried_at",
@@ -237,7 +237,7 @@ def get_calibration_frame(
 def list_calibration_frames(
     conn: sqlite3.Connection,
     telescope_id: str,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Return all calibration frames for a telescope."""
     rows = conn.execute(
         "SELECT * FROM calibration_frames WHERE telescope_id = ? ORDER BY date_obs",

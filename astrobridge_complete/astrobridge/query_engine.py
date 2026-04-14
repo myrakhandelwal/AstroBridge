@@ -13,7 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sqlite3
-from typing import Dict, List, Optional
+from typing import Optional
 
 from astrobridge.catalog_connectors import CatalogConnector
 from astrobridge.geometry import angular_distance_arcsec
@@ -41,11 +41,11 @@ class QueryEngine:
 
     def __init__(
         self,
-        connectors: Optional[Dict[str, CatalogConnector]] = None,
+        connectors: Optional[dict[str, CatalogConnector]] = None,
         match_radius_arcsec: float = DEFAULT_MATCH_RADIUS_ARCSEC,
         conn: Optional[sqlite3.Connection] = None,
     ) -> None:
-        self._connectors: Dict[str, CatalogConnector] = connectors or {}
+        self._connectors: dict[str, CatalogConnector] = connectors or {}
         self.match_radius_arcsec = match_radius_arcsec
         self._conn = conn
 
@@ -61,7 +61,7 @@ class QueryEngine:
     # Public query interface
     # ------------------------------------------------------------------
 
-    async def query_by_name(self, name: str) -> List[UnifiedObject]:
+    async def query_by_name(self, name: str) -> list[UnifiedObject]:
         """Query all connectors by object name and return merged objects."""
         if not self._connectors:
             logger.warning("No connectors registered in QueryEngine.")
@@ -71,7 +71,7 @@ class QueryEngine:
             catalog: asyncio.create_task(connector.query_object(name))
             for catalog, connector in self._connectors.items()
         }
-        results: Dict[str, List[Source]] = {}
+        results: dict[str, list[Source]] = {}
         for catalog, task in tasks.items():
             try:
                 results[catalog] = await task
@@ -86,7 +86,7 @@ class QueryEngine:
         ra: float,
         dec: float,
         radius_arcsec: float = 60.0,
-    ) -> List[UnifiedObject]:
+    ) -> list[UnifiedObject]:
         """Cone-search all connectors and return merged objects."""
         if not self._connectors:
             logger.warning("No connectors registered in QueryEngine.")
@@ -98,7 +98,7 @@ class QueryEngine:
             )
             for catalog, connector in self._connectors.items()
         }
-        results: Dict[str, List[Source]] = {}
+        results: dict[str, list[Source]] = {}
         for catalog, task in tasks.items():
             try:
                 results[catalog] = await task
@@ -118,7 +118,7 @@ class QueryEngine:
     # Clustering / merging
     # ------------------------------------------------------------------
 
-    def _merge(self, results: Dict[str, List[Source]]) -> List[UnifiedObject]:
+    def _merge(self, results: dict[str, list[Source]]) -> list[UnifiedObject]:
         """Cluster all returned sources into unified objects.
 
         Algorithm (greedy, O(n²)):
@@ -127,7 +127,7 @@ class QueryEngine:
            whose centroid is within ``match_radius_arcsec``, or start a new one.
         3. Build one UnifiedObject per cluster.
         """
-        flat: List[Source] = []
+        flat: list[Source] = []
         for sources in results.values():
             flat.extend(sources)
 
@@ -135,7 +135,7 @@ class QueryEngine:
             return []
 
         # Clusters are lists of Source objects
-        clusters: List[List[Source]] = []
+        clusters: list[list[Source]] = []
 
         for src in flat:
             placed = False
@@ -154,7 +154,7 @@ class QueryEngine:
             if not placed:
                 clusters.append([src])
 
-        unified: List[UnifiedObject] = []
+        unified: list[UnifiedObject] = []
         for cluster in clusters:
             try:
                 obj = UnifiedObject.from_sources(cluster)

@@ -2,17 +2,16 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
-from typing import Any, Sequence
+from collections.abc import Sequence
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from astrobridge.connectors import GaiaDR3TapAdapter, TwoMassTapAdapter
-from astrobridge.models import Coordinate, Source
+from astrobridge.models import Coordinate
 from astrobridge.routing.base import CatalogType, ObjectClass
 from astrobridge.routing.intelligent import CatalogRanker, NLPQueryRouter
-
 
 # ---------------------------------------------------------------------------
 # CatalogType enum — all new values present

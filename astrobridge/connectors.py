@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -852,10 +853,8 @@ class GaiaDR3TapAdapter(CatalogConnector):
         for band, key in [("G", "phot_g_mean_mag"), ("BP", "phot_bp_mean_mag"), ("RP", "phot_rp_mean_mag")]:
             val = self._value(row, [key, key.upper()], None)
             if val is not None:
-                try:
+                with contextlib.suppress(TypeError, ValueError):
                     photometry.append(Photometry(magnitude=float(val), band=band, magnitude_error=None))
-                except (TypeError, ValueError):
-                    pass
 
         return Source(
             id=f"GAIA_DR3:{main_id}",
@@ -1000,10 +999,8 @@ class TwoMassTapAdapter(CatalogConnector):
         for band, key in [("J", "j_m"), ("H", "h_m"), ("Ks", "k_m")]:
             val = self._value(row, [key, key.upper()], None)
             if val is not None:
-                try:
+                with contextlib.suppress(TypeError, ValueError):
                     photometry.append(Photometry(magnitude=float(val), band=band, magnitude_error=None))
-                except (TypeError, ValueError):
-                    pass
 
         return Source(
             id=f"2MASS:{main_id}",

@@ -16,7 +16,7 @@ import logging
 import time
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Optional
 
 from astrobridge.api.schemas import (
     CoordinateRequest,
@@ -49,11 +49,11 @@ class AstroBridgeOrchestrator:
         self,
         router=None,
         matcher=None,
-        connectors: Optional[Dict[str, CatalogConnector]] = None,
+        connectors: Optional[dict[str, CatalogConnector]] = None,
     ) -> None:
         self.router = router
         self.matcher = matcher
-        self.connectors: Dict[str, CatalogConnector] = dict(connectors or {})
+        self.connectors: dict[str, CatalogConnector] = dict(connectors or {})
 
     # ------------------------------------------------------------------
     # Registration
@@ -76,7 +76,7 @@ class AstroBridgeOrchestrator:
         """Execute a query and return the unified response."""
         start_ms = time.perf_counter() * 1000.0
         query_id = str(uuid.uuid4())
-        errors: List[str] = []
+        errors: list[str] = []
         routing_reasoning: Optional[str] = None
         search_radius_arcsec = 60.0
 
@@ -114,7 +114,7 @@ class AstroBridgeOrchestrator:
             self._apply_matcher_controls(request)
 
         # 3. Fan out
-        raw_sources: Dict[str, List[Source]] = {}
+        raw_sources: dict[str, list[Source]] = {}
         if request.query_type == "name":
             raw_sources = await self._fan_out_name(
                 request.name or "", active_connectors
@@ -129,8 +129,8 @@ class AstroBridgeOrchestrator:
             )
 
         # 4. Flatten and convert to responses
-        all_sources: List[Source] = []
-        for catalog_name, sources in raw_sources.items():
+        all_sources: list[Source] = []
+        for _catalog_name, sources in raw_sources.items():
             all_sources.extend(sources)
 
         source_responses = [
@@ -165,8 +165,8 @@ class AstroBridgeOrchestrator:
     async def _fan_out_name(
         self,
         name: str,
-        connectors: Dict[str, CatalogConnector],
-    ) -> Dict[str, List[Source]]:
+        connectors: dict[str, CatalogConnector],
+    ) -> dict[str, list[Source]]:
         if not name.strip() or not connectors:
             return {}
 
@@ -174,7 +174,7 @@ class AstroBridgeOrchestrator:
             n: asyncio.create_task(c.query_object(name))
             for n, c in connectors.items()
         }
-        results: Dict[str, List[Source]] = {}
+        results: dict[str, list[Source]] = {}
         for n, task in tasks.items():
             try:
                 results[n] = await task
@@ -187,8 +187,8 @@ class AstroBridgeOrchestrator:
         self,
         coord: CoordinateRequest,
         radius_arcsec: float,
-        connectors: Dict[str, CatalogConnector],
-    ) -> Dict[str, List[Source]]:
+        connectors: dict[str, CatalogConnector],
+    ) -> dict[str, list[Source]]:
         from astrobridge.models import Coordinate
         coordinate = Coordinate(ra=coord.ra, dec=coord.dec)
         effective_radius = coord.radius_arcsec if coord.radius_arcsec != 60.0 else radius_arcsec
@@ -197,7 +197,7 @@ class AstroBridgeOrchestrator:
             n: asyncio.create_task(c.cone_search(coordinate, effective_radius))
             for n, c in connectors.items()
         }
-        results: Dict[str, List[Source]] = {}
+        results: dict[str, list[Source]] = {}
         for n, task in tasks.items():
             try:
                 results[n] = await task
@@ -243,16 +243,14 @@ class AstroBridgeOrchestrator:
     # ------------------------------------------------------------------
 
     def _cross_match_sources(
-        self, sources: List[SourceResponse]
-    ) -> List[MatchResponse]:
+        self, sources: list[SourceResponse]
+    ) -> list[MatchResponse]:
         """Cross-match a flat list of SourceResponses using the configured matcher."""
         if self.matcher is None or len(sources) < 2:
             return []
 
         # Reconstruct minimal Source objects from responses for the matcher
-        from astrobridge.models import (
-            Coordinate, Photometry, Provenance, Source, Uncertainty
-        )
+        from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty
 
         def _to_source(sr: SourceResponse) -> Source:
             phot = (
@@ -275,12 +273,12 @@ class AstroBridgeOrchestrator:
             )
 
         # Partition by catalog to avoid matching a source against itself
-        by_catalog: Dict[str, List[SourceResponse]] = {}
+        by_catalog: dict[str, list[SourceResponse]] = {}
         for sr in sources:
             by_catalog.setdefault(sr.catalog, []).append(sr)
 
         catalog_names = list(by_catalog.keys())
-        match_responses: List[MatchResponse] = []
+        match_responses: list[MatchResponse] = []
 
         # Match each catalog pair
         for i in range(len(catalog_names)):
@@ -321,10 +319,7 @@ class AstroBridgeOrchestrator:
             v_band = next(
                 (p for p in source.photometry if p.band == "V"), None
             )
-            if v_band:
-                magnitude = v_band.magnitude
-            else:
-                magnitude = source.photometry[0].magnitude
+            magnitude = v_band.magnitude if v_band else source.photometry[0].magnitude
 
         return SourceResponse(
             id=source.id,

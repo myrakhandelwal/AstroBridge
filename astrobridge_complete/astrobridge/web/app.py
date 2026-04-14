@@ -13,10 +13,8 @@ POST /api/benchmark/run         – run a benchmark
 """
 from __future__ import annotations
 
-import asyncio
 import os
-import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
@@ -42,7 +40,7 @@ class JobSubmitRequest(BaseModel):
     query_type: str = "name"
     name: Optional[str] = None
     description: Optional[str] = None
-    coordinates: Optional[Dict[str, Any]] = None
+    coordinates: Optional[dict[str, Any]] = None
     auto_route: bool = True
 
 class BenchmarkRequest(BaseModel):
@@ -83,7 +81,7 @@ def _build_app() -> FastAPI:
 
 
     @_app.post("/api/identify")
-    async def identify(req: IdentifyRequest) -> Dict[str, Any]:
+    async def identify(req: IdentifyRequest) -> dict[str, Any]:
         if not req.input_text.strip():
             raise HTTPException(status_code=400, detail="input_text must not be empty")
 
@@ -105,7 +103,7 @@ def _build_app() -> FastAPI:
 
 
     @_app.post("/api/jobs")
-    async def submit_job(req: JobSubmitRequest) -> Dict[str, Any]:
+    async def submit_job(req: JobSubmitRequest) -> dict[str, Any]:
         query_req = QueryRequest(
             query_type=req.query_type,
             name=req.name,
@@ -117,14 +115,14 @@ def _build_app() -> FastAPI:
         return {"job_id": job_id, "status": "queued"}
 
     @_app.get("/api/jobs/{job_id}")
-    async def get_job_status(job_id: str) -> Dict[str, Any]:
+    async def get_job_status(job_id: str) -> dict[str, Any]:
         record = _job_manager.get_job(job_id)
         if record is None:
             raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
         return record.model_dump(mode="json")
 
     @_app.get("/api/jobs/{job_id}/result")
-    async def get_job_result(job_id: str) -> Dict[str, Any]:
+    async def get_job_result(job_id: str) -> dict[str, Any]:
         record = _job_manager.get_job(job_id)
         if record is None:
             raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
@@ -138,12 +136,12 @@ def _build_app() -> FastAPI:
     # ------------------------------------------------------------------
 
     @_app.post("/api/analytics/event")
-    async def record_event(event: AnalyticsEvent) -> Dict[str, Any]:
+    async def record_event(event: AnalyticsEvent) -> dict[str, Any]:
         _analytics.record(event)
         return {"status": "ok"}
 
     @_app.get("/api/analytics/summary")
-    async def analytics_summary() -> Dict[str, Any]:
+    async def analytics_summary() -> dict[str, Any]:
         return _analytics.summary()
 
     # ------------------------------------------------------------------
@@ -153,7 +151,7 @@ def _build_app() -> FastAPI:
 
 
     @_app.post("/api/benchmark/run")
-    async def run_benchmark(req: BenchmarkRequest) -> Dict[str, Any]:
+    async def run_benchmark(req: BenchmarkRequest) -> dict[str, Any]:
         from astrobridge.benchmarking import BenchmarkConfig
         config = BenchmarkConfig(iterations=req.iterations)
         result = await _benchmark.run(config)

@@ -7,10 +7,9 @@ data-shape contracts.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-
 
 # ---------------------------------------------------------------------------
 # Request primitives
@@ -59,7 +58,7 @@ class QueryRequest(BaseModel):
     )
     # Payload fields – exactly one is required depending on query_type
     name: Optional[str] = Field(None, description="Object name (query_type='name')")
-    coordinates: Optional[Union[CoordinateRequest, Dict[str, Any]]] = Field(
+    coordinates: Optional[CoordinateRequest | dict[str, Any]] = Field(
         None, description="Coordinate dict or CoordinateRequest (query_type='coordinates')"
     )
     description: Optional[str] = Field(
@@ -67,7 +66,7 @@ class QueryRequest(BaseModel):
     )
 
     # Catalog selection
-    catalogs: Optional[List[str]] = Field(
+    catalogs: Optional[list[str]] = Field(
         None, description="Explicit catalog list to query; None = all registered"
     )
     auto_route: bool = Field(
@@ -92,7 +91,7 @@ class QueryRequest(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _check_payload(self) -> "QueryRequest":
+    def _check_payload(self) -> QueryRequest:
         qt = self.query_type
         if qt not in _VALID_QUERY_TYPES:
             raise ValueError(
@@ -152,11 +151,11 @@ class QueryResponse(BaseModel):
     timestamp: datetime
     status: str  # "success" | "partial" | "error"
     query_type: str
-    catalogs_queried: List[str] = Field(default_factory=list)
-    sources: List[SourceResponse] = Field(default_factory=list)
-    matches: List[MatchResponse] = Field(default_factory=list)
+    catalogs_queried: list[str] = Field(default_factory=list)
+    sources: list[SourceResponse] = Field(default_factory=list)
+    matches: list[MatchResponse] = Field(default_factory=list)
     execution_time_ms: float = 0.0
-    errors: List[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
     routing_reasoning: Optional[str] = None
 
 

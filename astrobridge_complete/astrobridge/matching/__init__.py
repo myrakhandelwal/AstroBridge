@@ -1,7 +1,7 @@
 """Astronomical source cross-matching algorithms."""
-from astrobridge.matching.probabilistic import BayesianMatcher
 from astrobridge.matching.base import Matcher, MatcherError
 from astrobridge.matching.confidence import ConfidenceScorer, MatchScore
+from astrobridge.matching.probabilistic import BayesianMatcher
 from astrobridge.matching.spatial import SpatialIndex
 
 # Historical alias
