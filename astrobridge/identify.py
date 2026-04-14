@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from dataclasses import dataclass
 from typing import Optional
 
@@ -216,6 +217,17 @@ async def identify_from_catalogs(
     from astrobridge.ai_description import generate_description
     from astrobridge.lookup import lookup_object
 
+    def _ai_description_is_configured() -> bool:
+        """Return True when AI settings indicate a real backend is usable."""
+        provider = os.getenv("AI_PROVIDER", "stub").strip().lower()
+        if provider == "stub":
+            return False
+        if provider in {"openai", "anthropic"}:
+            return bool(os.getenv("AI_API_KEY", "").strip())
+        if provider == "local":
+            return bool(os.getenv("AI_BASE_URL", "").strip())
+        return False
+
     # 1. NLP classification (fast, no network)
     base = identify_object(input_text, router=router)
 
@@ -223,7 +235,7 @@ async def identify_from_catalogs(
     unified: Optional[UnifiedObject] = await lookup_object(input_text, timeout_sec=timeout_sec)
 
     # 3. Build description
-    if unified is not None and ai_description:
+    if unified is not None and ai_description and _ai_description_is_configured():
         description = generate_description(unified, conn=None)
     else:
         description = base.description

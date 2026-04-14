@@ -22,6 +22,7 @@ pip install -e .[dev]        # core + tests
 pip install -e .[live]       # + Gaia DR3, 2MASS, SIMBAD/NED live TAP
 pip install -e .[web]        # + FastAPI web console
 pip install anthropic         # + Claude AI descriptions (optional)
+pip install openai            # + OpenAI/local-compatible AI descriptions (optional)
 ```
 
 ---
@@ -117,10 +118,22 @@ export AI_API_KEY=sk-ant-...
 # OpenAI
 export AI_PROVIDER=openai
 export AI_API_KEY=sk-...
+export AI_MODEL=gpt-4o-mini
+
+# Local OpenAI-compatible endpoint (example)
+export AI_PROVIDER=local
+export AI_BASE_URL=http://127.0.0.1:11434/v1
+export AI_MODEL=your-local-model
 
 # Stub (default — no key needed)
 export AI_PROVIDER=stub
 ```
+
+Configuration is considered "real AI" when the provider requirements are satisfied:
+
+- `openai` or `anthropic`: set `AI_API_KEY`
+- `local`: set `AI_BASE_URL`
+- `stub`: deterministic offline fallback
 
 ```python
 from astrobridge.ai_description import generate_description

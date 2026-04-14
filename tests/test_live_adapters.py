@@ -6,31 +6,7 @@ import pytest
 
 from astrobridge.connectors import NedTapAdapter, SimbadTapAdapter
 from astrobridge.models import Coordinate
-
-
-class FakeRow(dict[str, object]):
-    """Simple row object matching minimal TAP row behavior."""
-
-    @property
-    def colnames(self) -> list[str]:
-        return list(self.keys())
-
-
-class FakeTapService:
-    """Captures ADQL and returns deterministic rows."""
-
-    def __init__(self, responses):
-        self.responses = list(responses)
-        self.queries = []
-
-    def search(self, adql):
-        self.queries.append(adql)
-        if not self.responses:
-            return []
-        response = self.responses.pop(0)
-        if isinstance(response, Exception):
-            raise response
-        return response
+from tests.tap_fakes import FakeRow, FakeTapService
 
 
 class SlowTapService:

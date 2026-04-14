@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -12,6 +11,7 @@ from astrobridge.connectors import GaiaDR3TapAdapter, TwoMassTapAdapter
 from astrobridge.models import Coordinate
 from astrobridge.routing.base import CatalogType, ObjectClass
 from astrobridge.routing.intelligent import CatalogRanker, NLPQueryRouter
+from tests.tap_fakes import StaticTapService
 
 # ---------------------------------------------------------------------------
 # CatalogType enum — all new values present
@@ -87,31 +87,6 @@ def test_exoplanet_keyword_extraction():
 
 
 # ---------------------------------------------------------------------------
-# Fake TAP service helper
-# ---------------------------------------------------------------------------
-
-class _FakeRow:
-    def __init__(self, data: dict):
-        self._data = data
-
-    def __getitem__(self, key: str):
-        if key in self._data:
-            return self._data[key]
-        raise KeyError(key)
-
-    def __contains__(self, key: str):
-        return key in self._data
-
-
-class _FakeTapService:
-    def __init__(self, rows: list[dict]):
-        self._rows = [_FakeRow(r) for r in rows]
-
-    def search(self, adql: str) -> Sequence[Any]:
-        return self._rows
-
-
-# ---------------------------------------------------------------------------
 # GaiaDR3TapAdapter
 # ---------------------------------------------------------------------------
 
@@ -134,7 +109,7 @@ GAIA_ROWS = [
 
 @pytest.fixture()
 def gaia_adapter():
-    return GaiaDR3TapAdapter(tap_service=_FakeTapService(GAIA_ROWS))
+    return GaiaDR3TapAdapter(tap_service=StaticTapService(GAIA_ROWS))
 
 
 def test_gaia_query_object_returns_empty(gaia_adapter):
@@ -185,7 +160,7 @@ def test_gaia_cone_search_zero_radius_returns_empty(gaia_adapter):
 
 
 def test_gaia_tap_error_returns_empty():
-    bad_service = _FakeTapService([])
+    bad_service = StaticTapService([])
     bad_service.search = MagicMock(side_effect=RuntimeError("TAP error"))
     adapter = GaiaDR3TapAdapter(tap_service=bad_service, max_retries=0)
     coord = Coordinate(ra=0.0, dec=0.0)
@@ -222,7 +197,7 @@ TWOMASS_ROWS = [
 
 @pytest.fixture()
 def twomass_adapter():
-    return TwoMassTapAdapter(tap_service=_FakeTapService(TWOMASS_ROWS))
+    return TwoMassTapAdapter(tap_service=StaticTapService(TWOMASS_ROWS))
 
 
 def test_twomass_query_object_returns_empty(twomass_adapter):
@@ -263,7 +238,7 @@ def test_twomass_cone_search_zero_radius(twomass_adapter):
 
 
 def test_twomass_tap_error_returns_empty():
-    bad_service = _FakeTapService([])
+    bad_service = StaticTapService([])
     bad_service.search = MagicMock(side_effect=RuntimeError("IRSA error"))
     adapter = TwoMassTapAdapter(tap_service=bad_service, max_retries=0)
     coord = Coordinate(ra=0.0, dec=0.0)
