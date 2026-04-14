@@ -759,7 +759,7 @@ class GaiaDR3TapAdapter(CatalogConnector):
             return
 
         try:
-            import pyvo as _pyvo  # type: ignore[import-untyped]
+            import pyvo as _pyvo
         except ImportError as exc:
             raise RuntimeError(
                 "GaiaDR3TapAdapter requires pyvo. Install with `pip install -e .[live]`."
@@ -908,7 +908,7 @@ class TwoMassTapAdapter(CatalogConnector):
             return
 
         try:
-            import pyvo as _pyvo  # type: ignore[import-untyped]
+            import pyvo as _pyvo
         except ImportError as exc:
             raise RuntimeError(
                 "TwoMassTapAdapter requires pyvo. Install with `pip install -e .[live]`."
