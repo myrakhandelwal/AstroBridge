@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 write_to = "astrobridge/_version.py"
 write_to_template = "__version__ = '{version}'"
-fallback_version = "0.3.3"
+fallback_version = "0.3.4"
 
 [project]
 name = "astrobridge"
