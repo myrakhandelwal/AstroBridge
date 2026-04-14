@@ -1,5 +1,65 @@
 # AstroBridge Release Notes
 
+---
+
+## v0.3.3 (April 14, 2026) — Live Catalogs, New Adapters & AI Descriptions
+
+**Tests**: 261 passing | **Tag**: `v0.3.3` | **Status**: ✅ Production Ready
+
+### What's New
+
+**Live Catalog Lookup (no local DB required)**
+- `astrobridge.lookup.lookup_object()` — two-step fan-out: SIMBAD/NED resolve the name, then Gaia DR3 + 2MASS enrich with positional cone searches
+- `astrobridge.lookup.lookup_by_coordinates()` — concurrent cone search across all 4 live adapters
+- Automatic fallback to local connectors when `pyvo` is not installed
+
+**New Live TAP Adapters**
+- `GaiaDR3TapAdapter` — ESA Gaia Archive TAP; cone search returns G/BP/RP photometry, proper motions, parallax
+- `TwoMassTapAdapter` — NASA IRSA TAP; cone search returns J/H/Ks photometry
+
+**Expanded Catalog Routing (13 catalogs)**
+- New `CatalogType` values: `TWOMASS`, `HIPPARCOS`, `ALLWISE`, `VIZIER`, `EXOPLANET_ARCHIVE`
+- All 13 catalogs scored across all 8 object classes
+- New NLP property modifiers: `nir` (2MASS/AllWISE boost), `exoplanet` (NASA Exoplanet Archive boost)
+
+**AI Descriptions**
+- `astrobridge.ai_description.generate_description()` — plain-language object descriptions
+- New `anthropic` provider backend (Claude); set `AI_PROVIDER=anthropic` + `AI_API_KEY`
+- `openai` and `stub` providers also supported
+- `identify_from_catalogs()` — async function combining NLP routing + live lookup + AI description in one call
+
+**New Modules (previously only in `astrobridge_complete/`)**
+- `astrobridge.database` — SQLite persistence: `objects`, `catalog_sources`, `calibration_frames` tables
+- `astrobridge.ccd_calibration` — CCD reduction pipeline (bias/dark/flat); uses astropy+ccdproc or pure NumPy fallback
+- `UnifiedObject` model added to `astrobridge.models` with `from_sources()` classmethod
+
+**Installation**
+```bash
+pip install astrobridge==0.3.3
+pip install astrobridge[live]==0.3.3    # Gaia DR3 + 2MASS + SIMBAD/NED live TAP
+pip install astrobridge[web]==0.3.3     # FastAPI web console
+```
+
+---
+
+## v0.3.2 (April 9, 2026) — mypy Fixes & Type Safety
+
+**Tests**: 182 passing | **Tag**: `v0.3.2`
+
+- Fixed mypy configuration and remaining type annotation issues
+- All strict mypy overrides passing on `connectors`, `orchestrator`, `jobs`
+
+---
+
+## v0.3.1 (April 9, 2026) — Test Suite Guide & Coverage Summary
+
+**Tests**: 182 passing | **Tag**: `v0.3.1`
+
+- Added comprehensive test suite documentation (`docs/Test Suite Guide.md`)
+- 34 new interactive demo tests covering all menu options
+
+---
+
 ## v0.3.0 (April 9, 2026) — Modernization & Type Safety
 
 ╔══════════════════════════════════════════════════════════════════════════════╗

@@ -5,416 +5,333 @@
 [![Status: Stable](https://img.shields.io/badge/status-stable-green.svg)](https://github.com/myrakhandelwal/AstroBridge)
 [![GitHub](https://img.shields.io/badge/github-myrakhandelwal%2FAstroBridge-blue.svg)](https://github.com/myrakhandelwal/AstroBridge)
 
-**Version: 0.3.0** — Modern Python Packaging, Strict Type Safety, Production-Ready
+**Version: 0.3.3** — Live Catalog Lookup, Multi-Catalog AI Identification, 261 Tests
 
-AstroBridge is a compact astronomical source matching pipeline that combines three pieces:
+AstroBridge is an astronomical source matching and cross-catalog identification pipeline. You give it an object name or sky coordinates; it fans out to real catalogs (SIMBAD, NED, Gaia DR3, 2MASS), merges the results, and optionally generates a plain-language description using an LLM.
 
-* type-safe source models for catalogs and coordinates
-* intelligent query routing for catalog selection
-* Bayesian cross-matching for candidate association  
+---
 
-The repository also includes async orchestration with bounded network concurrency, comprehensive quality gates, and a runnable demo for new users.
+## Install
 
-Recent additions include confidence scoring for every match, optional proper-motion-aware epoch matching, and modern PEP 621 packaging with setuptools_scm automation.
+```bash
+git clone https://github.com/myrakhandelwal/AstroBridge.git
+cd AstroBridge
+python -m venv .venv && source .venv/bin/activate
+
+pip install -e .[dev]        # core + tests
+pip install -e .[live]       # + Gaia DR3, 2MASS, SIMBAD/NED live TAP
+pip install -e .[web]        # + FastAPI web console
+pip install anthropic         # + Claude AI descriptions (optional)
+```
+
+---
 
 ## Quick Start
 
-Create a virtual environment, install the package, then run CLI-first workflows.
-
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .[dev]
-```
-
-Run the demo:
-
-```bash
-astrobridge-demo
-```
-
-Or run it directly:
-
-```bash
+# End-to-end pipeline demo (synthetic data, no network needed)
 python demo.py
-```
 
-Run the test suite:
-
-```bash
-pytest
-```
-
-Run the object-identification command:
-
-```bash
+# Identify an object and get catalog recommendations
+astrobridge-identify "Proxima Centauri"
 astrobridge-identify "Find nearby red dwarf stars"
-```
 
-This prints the inferred object class, a short description of what it is, the suggested search radius, and the best starting catalogs.
-
-## Interactive Live Demo
-
-For hands-on exploration with live user input, run the interactive demo:
-
-```bash
+# Interactive menu-driven demo
 python interactive_demo.py
+
+# Web console at http://127.0.0.1:8000
+astrobridge-web
 ```
 
-Or via entry point:
+---
+
+## Live Catalog Lookup
+
+`lookup_object()` uses a two-step strategy — no local database required:
+
+1. **Name resolution** — fans out to SIMBAD + NED concurrently
+2. **Positional enrichment** — uses the returned coordinates to cone-search Gaia DR3 and 2MASS
+
+```python
+import asyncio
+from astrobridge.lookup import lookup_object, lookup_by_coordinates
+
+async def main():
+    # Look up by name
+    obj = await lookup_object("Proxima Centauri")
+    if obj:
+        print(obj.primary_name)          # Proxima Centauri
+        print(f"RA={obj.ra:.4f}  Dec={obj.dec:.4f}")
+        print("catalogs:", list(obj.catalog_entries.keys()))
+        print("photometry:", obj.photometry_summary)
+
+    # Cone search by coordinates
+    results = await lookup_by_coordinates(ra=217.429, dec=-62.680, radius_arcsec=60)
+    for r in results:
+        print(r.primary_name, r.ra, r.dec)
+
+asyncio.run(main())
+```
+
+**Requires** `pip install -e .[live]` for live network queries. Falls back to local connectors automatically when `pyvo` is not installed.
+
+---
+
+## Object Identification
+
+Combines NLP routing, live catalog lookup, and optional AI description in one call:
+
+```python
+import asyncio
+from astrobridge.identify import identify_from_catalogs
+
+async def main():
+    result = await identify_from_catalogs("M31")
+    print(result["object_class"])       # galaxy
+    print(result["description"])        # plain-language description
+    print(result["top_catalogs"])       # ['NED', 'SDSS', 'ALLWISE']
+    print(result["catalog_data"])       # real RA/Dec + photometry from catalogs
+
+asyncio.run(main())
+```
+
+For CLI use:
 
 ```bash
-astrobridge-interactive
+astrobridge-identify "M31"
+astrobridge-identify "Find high-redshift quasars"
+astrobridge-identify --json "Betelgeuse"
 ```
 
-The interactive demo provides a menu-driven interface to:
-- **Query by object name** — Search for specific astronomical objects (Proxima Centauri, M31, etc.)
-- **Query by coordinates** — Cone search around RA/Dec position with custom radius
-- **Natural language queries** — Describe what you're looking for; router handles the rest
-- **Object identification** — Classify targets and get recommended catalogs
-- **Advanced matcher controls** — Test different confidence weighting profiles
-- **Performance benchmarking** — Measure query latency across iterations
+---
 
-All queries use live connectors (if `[live]` is installed) or fall back to local synthetic data for teaching/testing.
+## AI Descriptions
 
-## Quality Gates & Type Safety
-
-**All checks passing** ✅
+Set environment variables to enable real LLM descriptions. Defaults to a deterministic stub (no API key needed).
 
 ```bash
-# Modern linting with Ruff
-ruff check .          # E, F, I, UP, B, SIM rules
+# Anthropic Claude (recommended)
+export AI_PROVIDER=anthropic
+export AI_API_KEY=sk-ant-...
 
-# Strict type checking on core modules  
-mypy astrobridge/     # Protocol-based typing, null safety
+# OpenAI
+export AI_PROVIDER=openai
+export AI_API_KEY=sk-...
 
-# Complete test coverage
-pytest -q             # 261 tests passing, zero warnings
+# Stub (default — no key needed)
+export AI_PROVIDER=stub
 ```
 
-**Automated Versioning**  
-Versions are automatically derived from git tags using `setuptools_scm`. No manual version edits needed.
+```python
+from astrobridge.ai_description import generate_description
+from astrobridge.models import UnifiedObject
 
-```bash
-# To release a new version
-git tag -a v0.3.1 -m "Release message"
-git push --tags
-# Version auto-bumps at build time
+obj = UnifiedObject(primary_name="M31", ra=10.685, dec=41.269, object_type="galaxy")
+print(generate_description(obj))
 ```
 
-## Optional Web UI
+---
 
-The web console is an optional side interface for interactive use. The primary workflow remains CLI and importable Python modules.
-
-```bash
-pip install -e .[web]
-./.venv/bin/astrobridge-web
-```
-
-Then open `http://127.0.0.1:8000` in your browser.
-
-## Command Reference
-
-Commands currently developed in AstroBridge:
-
-1. `astrobridge-demo`
-	Runs the end-to-end demonstration of models, routing, matching, and orchestration.
-
-2. `python demo.py`
-	Alternate way to run the same demo script directly.
-
-3. `astrobridge-identify "<input>"`
-	Classifies the object/query text and returns a plain-language description, recommended search radius, and top catalogs.
-
-4. `python -m astrobridge.identify "<input>"`
-	Module-invocation fallback for identification (useful if console scripts are not on PATH).
-
-5. `astrobridge-web`
-	Starts the FastAPI web console on `127.0.0.1:8000` (optional UI path).
-
-6. `python -m astrobridge.web.app`
-	Module-invocation fallback to start the same web server.
-
-7. `pytest`
-	Runs the full test suite.
-
-8. `pytest tests/test_identify.py tests/test_web.py -q`
-	Fast validation for identification and web error-handling paths.
-
-9. `pip install -e .[dev]`
-	Installs AstroBridge in editable mode with development dependencies.
-
-10. `pip install -e .[live]`
-	 Installs optional live TAP adapter dependencies.
-
-11. `pip install -e .[web]`
-	 Installs optional web console dependencies.
-
-## Advanced API Endpoints
-
-The following production-foundation endpoints are now available in the FastAPI app:
-
-1. `POST /api/jobs`
-	Submit an asynchronous query job for longer-running workloads.
-
-2. `GET /api/jobs/{job_id}`
-	Check background job status (`queued`, `running`, `completed`, `failed`).
-
-3. `GET /api/jobs/{job_id}/result`
-	Fetch completed job output.
-
-4. `POST /api/analytics/event`
-	Record educational or operational analytics events.
-
-5. `GET /api/analytics/summary`
-	Return aggregate analytics summary for tracked events.
-
-6. `POST /api/benchmark/run`
-	Execute a reproducible benchmark run and return latency/success metrics.
-
-## Persistent State (Jobs + Analytics)
-
-AstroBridge now persists background job records and analytics events in SQLite.
-
-By default, state is stored at:
-
-```text
-.astrobridge/state.db
-```
-
-Override location with:
-
-```bash
-export ASTROBRIDGE_STATE_DB="/absolute/path/to/state.db"
-```
-
-This persistence is used by:
-
-1. `POST /api/jobs` and related job result/status endpoints.
-2. `POST /api/analytics/event` and `GET /api/analytics/summary`.
-
-## Documentation
-
-For detailed information:
-
-1. **[docs/Command Guide.md](docs/Command%20Guide.md)** — Complete user guide with CLI commands, REST API endpoints, Python API examples, and expected output samples.
-
-2. **[docs/Algorithm and Science.md](docs/Algorithm%20and%20Science.md)** — Deep dive into the Bayesian matching algorithm, mathematical foundations, photometric and astrometric likelihoods, proper-motion corrections, and practical examples with real data.
-
-3. **[docs/Architecture Guide.md](docs/Architecture%20Guide.md)** — System architecture, component design, advanced usage patterns, custom catalog adapters, batch processing, reproducible workflows, and teaching applications for research and education.
-
-4. **[docs/Deployment Guide.md](docs/Deployment%20Guide.md)** — Production deployment strategies (Docker, AWS, Kubernetes), PyPI releases, database setup, monitoring, security hardening, and disaster recovery planning.
-
-5. **[docs/AstroBridge_Research_Paper_Full.tex](docs/AstroBridge_Research_Paper_Full.tex)** — Full research manuscript aligned with the implemented pipeline, including validated benchmark and test metrics.
-
-6. **[docs/AstroBridge_Research_Paper_Conference.tex](docs/AstroBridge_Research_Paper_Conference.tex)** — Short conference-format paper version (4-6 pages) for submissions.
-
-7. **[docs/Platforms_and_Catalogs_Matrix.md](docs/Platforms_and_Catalogs_Matrix.md)** — Catalog and platform matrix showing object coverage and recommended usage.
-
-## Package API Reference (Current)
-
-Key public classes/functions currently implemented:
-
-1. `astrobridge.api.AstroBridgeOrchestrator`
-	Main orchestration entry for routed catalog querying.
-
-2. `astrobridge.api.QueryRequest`
-	Request model including routing and matcher controls.
-
-3. `astrobridge.matching.BayesianMatcher`
-	Probabilistic matcher with proper-motion-aware options.
-
-4. `astrobridge.matching.ConfidenceScorer`
-	Match confidence computation with weighting profiles.
-
-5. `astrobridge.identify.identify_object`
-	AI-assisted classification and explanatory target description.
-
-6. `astrobridge.analytics.AnalyticsStore`
-	Event store with SQLite-backed telemetry persistence.
-
-7. `astrobridge.jobs.JobManager`
-	Background query job lifecycle manager with persisted state.
-
-8. `astrobridge.benchmarking.BenchmarkRunner`
-	Reproducible latency/success benchmark execution.
-
-9. `astrobridge.database`
-	SQLite persistence layer: `objects`, `catalog_sources`, and `calibration_frames` tables with full CRUD helpers.
-
-10. `astrobridge.ccd_calibration.calibrate_ccd`
-	CCD image reduction pipeline (bias, dark, flat); uses `astropy` + `ccdproc` when available, falls back to pure NumPy.
-
-11. `astrobridge.ai_description.generate_description`
-	LLM-backed plain-language object descriptions with SQLite caching.  Defaults to a deterministic stub; set `AI_PROVIDER=anthropic` (or `openai`) and `AI_API_KEY` to enable live descriptions.
-
-12. `astrobridge.lookup.lookup_object`
-	Two-step live catalog fan-out: SIMBAD/NED resolve the name, then Gaia DR3 + 2MASS enrich with astrometry and multi-band photometry.  No local database required.
-
-13. `astrobridge.connectors.GaiaDR3TapAdapter`
-	Live Gaia DR3 cone-search adapter via ESA TAP.  Returns G/BP/RP photometry and proper motions.
-
-14. `astrobridge.connectors.TwoMassTapAdapter`
-	Live 2MASS Point Source Catalog adapter via NASA IRSA TAP.  Returns J/H/Ks photometry.
-
-## What You Get
-
-* [astrobridge.models](astrobridge/models.py) — `Source`, `Coordinate`, `Uncertainty`, `Photometry`, `Provenance`, `UnifiedObject`
-* [astrobridge.routing](astrobridge/routing) — NLP query routing across 13 catalog types
-* [astrobridge.matching](astrobridge/matching) — Bayesian probabilistic source matching
-* [astrobridge.api](astrobridge/api) — orchestration, request/response schemas
-* [astrobridge.lookup](astrobridge/lookup.py) — live two-step catalog fan-out (no database required)
-* [astrobridge.connectors](astrobridge/connectors.py) — live TAP adapters: SIMBAD, NED, Gaia DR3, 2MASS
-* [astrobridge.database](astrobridge/database.py) — SQLite-backed persistence (objects, catalog sources, calibration frames)
-* [astrobridge.ccd_calibration](astrobridge/ccd_calibration.py) — CCD image reduction (bias/dark/flat)
-* [astrobridge.ai_description](astrobridge/ai_description.py) — LLM-generated descriptions (`anthropic` | `openai` | `stub`)
-
-## Supported Catalogs
-
-| Catalog | Type | Live adapter | Object types |
-|---------|------|-------------|--------------|
-| SIMBAD | General | `SimbadTapAdapter` | All |
-| NED | Extragalactic | `NedTapAdapter` | Galaxies, QSOs, AGN |
-| Gaia DR3 | Astrometry | `GaiaDR3TapAdapter` | Stars, clusters |
-| 2MASS | Near-IR | `TwoMassTapAdapter` | Stars, galaxies |
-| SDSS | Optical | routing only | Stars, galaxies, QSOs |
-| PanSTARRS | Optical | routing only | Stars, SNe, galaxies |
-| WISE | Mid-IR | routing only | All |
-| AllWISE | Mid-IR | routing only | AGN, galaxies |
-| ZTF | Time-domain | routing only | Transients, SNe, variables |
-| ATLAS | Time-domain | routing only | SNe, variables |
-| Hipparcos | Astrometry | routing only | Bright stars |
-| VizieR | General | routing only | All |
-| NASA Exoplanet Archive | Exoplanets | routing only | Exoplanet hosts |
-
-## Matching Features
-
-The probabilistic matcher now supports:
-
-* confidence scoring with human-readable rationale (astrometric, photometric, and ambiguity-aware)
-* optional proper-motion-aware matching across catalogs observed at different epochs
-* deterministic scoring behavior for reproducible runs and testing
-
-Example usage with proper motion support:
+## Bayesian Cross-Matching
 
 ```python
 from astrobridge.matching import BayesianMatcher
 
 matcher = BayesianMatcher(proper_motion_aware=True)
-matches = matcher.match(ref_sources, candidate_sources)
+matches = matcher.match(reference_sources, candidate_sources)
+
+for m in matches:
+    print(f"{m.source1_id} ↔ {m.source2_id}  p={m.match_probability:.3f}  sep={m.separation_arcsec:.2f}\"")
 ```
 
-API-level matcher controls are also available through `QueryRequest`:
+Matching controls available on every `QueryRequest`:
 
-* `proper_motion_aware` (bool)
-* `match_epoch` (datetime)
-* `astrometric_weight` (0-1)
-* `photometric_weight` (0-1)
-* `weighting_profile` (`balanced`, `position_first`, `photometry_first`)
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `proper_motion_aware` | bool | Apply proper-motion corrections across epochs |
+| `match_epoch` | datetime | Reference epoch for PM corrections |
+| `weighting_profile` | str | `balanced` \| `position_first` \| `photometry_first` |
+| `astrometric_weight` | 0–1 | Manual astrometric weight override |
+| `photometric_weight` | 0–1 | Manual photometric weight override |
 
-These are applied by the orchestrator before query execution so callers can tune matching behavior per request.
+---
 
-The web console includes these controls directly in the UI so users can run interactive experiments without writing Python code.
-
-## Demo Flow
-
-The demo script walks through the core phases in order and now covers the full package surface:
-
-1. canonical models
-2. intelligent routing
-3. Bayesian matching
-4. async orchestration
-5. object identification
-6. telemetry, persistence, and background jobs
-7. reproducible benchmarking
-
-It uses synthetic data so it can run without external catalog access.
-
-## Development Notes
-
-The test suite uses `pytest-asyncio`, which is included in the `dev` extra.
-
-## License
-
-AstroBridge is licensed under the MIT License. See [LICENSE](LICENSE).
-
-Simbad and NED currently use deterministic local datasets for fast, reliable development and CI validation.
-
-## Live Catalog Adapters
-
-AstroBridge includes live TAP adapters for four catalogs.  All require `pyvo` (install with `pip install -e .[live]`).
-
-| Adapter | Catalog | Name lookup | Cone search | TAP endpoint |
-|---------|---------|-------------|-------------|--------------|
-| `SimbadTapAdapter` | CDS SIMBAD | ✅ | ✅ | `simbad.cds.unistra.fr` |
-| `NedTapAdapter` | NASA NED | ✅ | ✅ | `ned.ipac.caltech.edu` |
-| `GaiaDR3TapAdapter` | ESA Gaia DR3 | — | ✅ | `gea.esac.esa.int` |
-| `TwoMassTapAdapter` | 2MASS PSC via IRSA | — | ✅ | `irsa.ipac.caltech.edu` |
-
-Gaia DR3 and 2MASS do not have a human-readable name index.  `lookup_object()` automatically uses a **two-step strategy**: SIMBAD/NED resolve the name to a position, then Gaia DR3 and 2MASS cone-search around that position for multi-wavelength enrichment.
-
-```bash
-pip install -e .[live]
-```
+## Orchestrator (Multi-Catalog Queries)
 
 ```python
 import asyncio
-from astrobridge.lookup import lookup_object
+from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
+from astrobridge.matching import BayesianMatcher
+from astrobridge.routing import NLPQueryRouter
 
 async def main():
-    obj = await lookup_object("Proxima Centauri")
-    if obj:
-        print(obj.primary_name, obj.ra, obj.dec)
-        print("catalogs:", list(obj.catalog_entries.keys()))
-        print("photometry:", obj.photometry_summary)
+    orch = AstroBridgeOrchestrator(router=NLPQueryRouter(), matcher=BayesianMatcher())
+
+    # Name query
+    req = QueryRequest(query_type="name", name="Sirius", auto_route=True)
+    resp = await orch.execute_query(req)
+    print(resp.status, len(resp.sources), "sources")
+
+    # Natural language
+    req2 = QueryRequest(
+        query_type="natural_language",
+        description="Find nearby infrared-bright red dwarfs",
+        auto_route=True,
+        weighting_profile="position_first",
+    )
+    resp2 = await orch.execute_query(req2)
+    print(resp2.routing_reasoning)
 
 asyncio.run(main())
 ```
 
-Direct adapter usage:
+---
 
-```python
-from astrobridge.connectors import SimbadTapAdapter, GaiaDR3TapAdapter
-from astrobridge.models import Coordinate
+## Supported Catalogs
 
-async def main():
-    # Name lookup — SIMBAD
-    simbad = SimbadTapAdapter()
-    hits = await simbad.query_object("M31")
-    print("SIMBAD hits:", len(hits))
+| Catalog | Live Adapter | Name Lookup | Cone Search | Best For |
+|---------|-------------|-------------|-------------|----------|
+| SIMBAD | `SimbadTapAdapter` | ✅ | ✅ | All objects, name resolution |
+| NED | `NedTapAdapter` | ✅ | ✅ | Galaxies, AGN, quasars |
+| Gaia DR3 | `GaiaDR3TapAdapter` | — | ✅ | Stars: astrometry + proper motions |
+| 2MASS | `TwoMassTapAdapter` | — | ✅ | Stars + galaxies: J/H/Ks photometry |
+| SDSS | routing only | | | Galaxies, QSOs, optical photometry |
+| WISE | routing only | | | Mid-IR sources, AGN |
+| AllWISE | routing only | | | Improved WISE + proper motions |
+| PanSTARRS | routing only | | | Transients, wide-field optical |
+| ZTF | routing only | | | Supernovae, variables, transients |
+| ATLAS | routing only | | | Transient alerts, SNe |
+| Hipparcos | routing only | | | Bright stars (V < 12) |
+| VizieR | routing only | | | Any published catalog table |
+| NASA Exoplanet Archive | routing only | | | Exoplanet host stars |
 
-    # Positional enrichment — Gaia DR3
-    gaia = GaiaDR3TapAdapter()
-    coord = Coordinate(ra=10.685, dec=41.269)
-    stars = await gaia.cone_search(coord, radius_arcsec=30)
-    print("Gaia stars:", len(stars))
+Live adapters require `pip install -e .[live]`.
 
-asyncio.run(main())
+---
+
+## Web Console
+
+```bash
+pip install -e .[web]
+astrobridge-web
+# → http://127.0.0.1:8000
 ```
 
-## Test Coverage For Adapter Steps
+REST API endpoints:
 
-Every adapter development step should include tests under [tests/](tests/).
-Current live-adapter unit coverage is in [tests/test_live_adapters.py](tests/test_live_adapters.py) using injected fake TAP services so tests stay deterministic and network-independent. This suite now includes retry, timeout, and malformed-row fallback scenarios for both TAP adapters.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/query` | Run a cross-catalog query |
+| `POST` | `/api/identify` | Identify object + live catalog lookup + AI description |
+| `POST` | `/api/jobs` | Submit async background job |
+| `GET` | `/api/jobs/{id}` | Check job status |
+| `GET` | `/api/jobs/{id}/result` | Fetch completed job result |
+| `POST` | `/api/analytics/event` | Record analytics event |
+| `GET` | `/api/analytics/summary` | Aggregate analytics summary |
+| `POST` | `/api/benchmark/run` | Run latency benchmark |
+
+---
+
+## Quality Gates
+
+```bash
+ruff check .          # linting
+mypy astrobridge/     # strict type checking on core modules
+pytest -q             # 261 tests, zero warnings
+```
+
+All gates run automatically on every push via GitHub Actions.
+
+---
+
+## Persistent State
+
+Jobs and analytics are persisted in SQLite. Default path: `.astrobridge/state.db`
+
+```bash
+export ASTROBRIDGE_STATE_DB="/path/to/state.db"   # override location
+```
+
+---
+
+## Package API Reference
+
+| Import | Description |
+|--------|-------------|
+| `astrobridge.lookup.lookup_object` | Two-step live catalog fan-out by name |
+| `astrobridge.lookup.lookup_by_coordinates` | Concurrent cone search across all live adapters |
+| `astrobridge.identify.identify_from_catalogs` | NLP routing + live lookup + AI description |
+| `astrobridge.identify.identify_object` | NLP classification only (no network) |
+| `astrobridge.api.AstroBridgeOrchestrator` | Multi-catalog query orchestration |
+| `astrobridge.api.QueryRequest` | Request model with matcher + routing controls |
+| `astrobridge.matching.BayesianMatcher` | Probabilistic cross-matching with PM support |
+| `astrobridge.matching.ConfidenceScorer` | Match confidence with weighting profiles |
+| `astrobridge.connectors.SimbadTapAdapter` | Live SIMBAD TAP (name + cone) |
+| `astrobridge.connectors.NedTapAdapter` | Live NED TAP (name + cone) |
+| `astrobridge.connectors.GaiaDR3TapAdapter` | Live Gaia DR3 TAP (cone only) |
+| `astrobridge.connectors.TwoMassTapAdapter` | Live 2MASS TAP via IRSA (cone only) |
+| `astrobridge.ai_description.generate_description` | LLM description (anthropic / openai / stub) |
+| `astrobridge.analytics.AnalyticsStore` | SQLite-backed telemetry events |
+| `astrobridge.jobs.JobManager` | Background job lifecycle manager |
+| `astrobridge.benchmarking.BenchmarkRunner` | Reproducible latency benchmarks |
+| `astrobridge.database` | SQLite persistence for objects, sources, calibration frames |
+| `astrobridge.ccd_calibration.calibrate_ccd` | CCD reduction: bias/dark/flat (astropy or NumPy) |
+| `astrobridge.models.UnifiedObject` | Merged multi-catalog view with `from_sources()` |
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/Command Guide.md](docs/Command%20Guide.md) | CLI commands, REST API, Python API examples |
+| [docs/Algorithm and Science.md](docs/Algorithm%20and%20Science.md) | Bayesian matching math, proper-motion corrections |
+| [docs/Architecture Guide.md](docs/Architecture%20Guide.md) | System design, component flow, custom adapters |
+| [docs/Deployment Guide.md](docs/Deployment%20Guide.md) | Docker, AWS, PyPI release, monitoring |
+| [docs/Platforms_and_Catalogs_Matrix.md](docs/Platforms_and_Catalogs_Matrix.md) | All 13 catalogs: routing scores, adapter status |
+| [docs/Test Suite Guide.md](docs/Test%20Suite%20Guide.md) | All 261 tests described by file and category |
+| [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) | Full changelog: v0.1.1 → v0.3.3 |
+
+---
 
 ## Project Layout
 
-* [demo.py](demo.py) - runnable walkthrough of the system
-* [astrobridge/models.py](astrobridge/models.py) - domain models
-* [astrobridge/routing/](astrobridge/routing) - NLP routing and catalog ranking
-* [astrobridge/matching/](astrobridge/matching) - Bayesian matching and calibration
-* [astrobridge/api/](astrobridge/api) - orchestration and schemas
+```
+astrobridge/
+├── models.py           # Source, Coordinate, UnifiedObject, MatchResult
+├── lookup.py           # Live two-step catalog fan-out
+├── identify.py         # NLP classification + identify_from_catalogs()
+├── connectors.py       # SimbadTapAdapter, NedTapAdapter, GaiaDR3TapAdapter, TwoMassTapAdapter
+├── ai_description.py   # LLM descriptions (anthropic / openai / stub)
+├── database.py         # SQLite persistence layer
+├── ccd_calibration.py  # CCD reduction pipeline
+├── geometry.py         # Angular distance calculations
+├── routing/            # NLPQueryRouter, CatalogRanker, 13 CatalogTypes
+├── matching/           # BayesianMatcher, ConfidenceScorer, SpatialIndex
+├── api/                # AstroBridgeOrchestrator, QueryRequest/Response
+├── web/                # FastAPI app, REST endpoints, HTML console
+├── analytics.py        # AnalyticsStore, event tracking
+├── jobs.py             # JobManager, background query lifecycle
+└── benchmarking.py     # BenchmarkRunner
+```
 
-## Status
+---
 
-The repository currently passes its full test suite (261/261) in the default virtual environment when the dev dependencies are installed.
+## Release History
 
-## Handoff Notes
+| Tag | Date | Highlights |
+|-----|------|------------|
+| `v0.3.3` | Apr 14 2026 | Live catalogs, Gaia DR3 + 2MASS adapters, AI descriptions, 261 tests |
+| `v0.3.2` | Apr 9 2026 | mypy strict fixes |
+| `v0.3.1` | Apr 9 2026 | Interactive demo, test suite guide |
+| `v0.3.0` | Apr 9 2026 | PEP 621 packaging, ruff, async concurrency |
+| `v0.2.0` | Apr 8 2026 | Comprehensive docs, deployment guide |
+| `v0.1.1` | — | Initial release |
 
-Use [WORKLOG.md](WORKLOG.md) as the running implementation journal for future contributors.
-Store run/test validation artifacts in [logs/](logs/) for reproducible handoff checkpoints.
+---
 
-The next major step is implementing real catalog connectors and unskipping integration tests that currently depend on live connector behavior.
-Simbad and NED now include deterministic local implementations for `query_object` and `cone_search`, and integration matching tests run without skips.
+## License
 
-The next major step is adding multi-attribute weighted matching controls (for example spatial + photometric weighting profiles) and exposing these controls through the API layer.
+MIT License — Copyright © 2026 Myra Khandelwal
+
+Simbad and NED fall back to local deterministic datasets when `pyvo` is not installed, so all tests and demos run without network access.
