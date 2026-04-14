@@ -96,9 +96,9 @@ def _call_openai(prompt: str, system: str, model: str, api_key: str, base_url: O
 
 def _call_stub(prompt: str, _system: str, _model: str, _key: str, _base: Optional[str]) -> str:
     """Return a deterministic placeholder (no network required)."""
-    obj_line = next((l for l in prompt.splitlines() if l.startswith("Name:")), "")
+    obj_line = next((line for line in prompt.splitlines() if line.startswith("Name:")), "")
     name = obj_line.replace("Name:", "").strip() or "this object"
-    type_line = next((l for l in prompt.splitlines() if l.startswith("Type:")), "")
+    type_line = next((line for line in prompt.splitlines() if line.startswith("Type:")), "")
     obj_type = type_line.replace("Type:", "").strip() or "astronomical object"
     return (
         f"{name} is a {obj_type} catalogued in AstroBridge. "

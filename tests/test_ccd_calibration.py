@@ -1,7 +1,4 @@
 """Tests for astrobridge.ccd_calibration — CCD reduction pipeline."""
-import os
-import sqlite3
-from pathlib import Path
 
 import pytest
 
@@ -12,7 +9,6 @@ from astrobridge.ccd_calibration import (
     calibrate_ccd,
 )
 from astrobridge.database import init_db, register_calibration_frame
-
 
 # ---------------------------------------------------------------------------
 # Helper predicates

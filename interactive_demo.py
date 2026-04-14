@@ -15,16 +15,13 @@ Run: python interactive_demo.py
 
 import asyncio
 import sys
-from typing import Optional
 
 from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
 from astrobridge.api.schemas import CoordinateRequest
-from astrobridge.analytics import AnalyticsEvent, AnalyticsStore
 from astrobridge.benchmarking import BenchmarkConfig, BenchmarkRunner
 from astrobridge.connectors import NEDConnector, SimbadConnector
 from astrobridge.identify import format_identification, identify_object
 from astrobridge.matching import BayesianMatcher
-from astrobridge.models import Source
 from astrobridge.routing import NLPQueryRouter
 
 
@@ -213,7 +210,7 @@ async def demo_benchmarking(orchestrator: AstroBridgeOrchestrator) -> None:
     print(f"Total queries: {results.total_queries}")
     print(f"Successful: {results.successful_count}")
     print(f"Failed: {results.failed_count}")
-    print(f"\nLatency Statistics:")
+    print("\nLatency Statistics:")
     print(f"  Mean: {results.mean_latency_ms:.2f}ms")
     print(f"  Median (P50): {results.p50_latency_ms:.2f}ms")
     print(f"  P95: {results.p95_latency_ms:.2f}ms")

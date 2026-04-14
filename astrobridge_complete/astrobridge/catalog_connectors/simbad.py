@@ -14,11 +14,12 @@ Two implementations are provided:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any, Callable, List, Optional, Protocol, TypeVar
+from typing import Any, Callable, Optional, Protocol, TypeVar
 
 from astrobridge.catalog_connectors import CatalogConnector
 from astrobridge.geometry import angular_distance_arcsec
@@ -147,13 +148,13 @@ class SimbadConnector(CatalogConnector):
                 return src.model_copy(deep=True)
         return None
 
-    async def query_object(self, name: str) -> List[Source]:
+    async def query_object(self, name: str) -> list[Source]:
         result = self.query_by_name(name)
         return [result] if result is not None else []
 
     async def cone_search(
         self, ra: float, dec: float, radius_arcsec: float
-    ) -> List[Source]:
+    ) -> list[Source]:
         if radius_arcsec <= 0:
             return []
         hits = [
@@ -237,7 +238,7 @@ class SimbadTapAdapter(CatalogConnector):
         rows = self._query_by_name_sync(name)
         return self._row_to_source(rows[0]) if rows else None
 
-    async def query_object(self, name: str) -> List[Source]:
+    async def query_object(self, name: str) -> list[Source]:
         try:
             return await self._run_io(self._query_by_name_sync, name)
         except asyncio.TimeoutError:
@@ -246,7 +247,7 @@ class SimbadTapAdapter(CatalogConnector):
 
     async def cone_search(
         self, ra: float, dec: float, radius_arcsec: float
-    ) -> List[Source]:
+    ) -> list[Source]:
         try:
             return await self._run_io(self._cone_search_sync, ra, dec, radius_arcsec)
         except asyncio.TimeoutError:
@@ -266,7 +267,7 @@ class SimbadTapAdapter(CatalogConnector):
                 timeout=self.request_timeout_sec,
             )
 
-    def _query_by_name_sync(self, name: str) -> List[Any]:
+    def _query_by_name_sync(self, name: str) -> list[Any]:
         stripped = name.strip()
         if not stripped:
             return []
@@ -288,7 +289,7 @@ class SimbadTapAdapter(CatalogConnector):
 
     def _cone_search_sync(
         self, ra: float, dec: float, radius_arcsec: float
-    ) -> List[Source]:
+    ) -> list[Source]:
         if radius_arcsec <= 0:
             return []
         radius_deg = radius_arcsec / 3600.0
@@ -306,7 +307,7 @@ class SimbadTapAdapter(CatalogConnector):
         rows = self._search_with_retries(adql, context="cone search")
         return [self._row_to_source(r) for r in rows]
 
-    def _search_with_retries(self, adql: str, context: str) -> List[Any]:
+    def _search_with_retries(self, adql: str, context: str) -> list[Any]:
         attempts = self.max_retries + 1
         for attempt in range(attempts):
             try:
@@ -324,7 +325,7 @@ class SimbadTapAdapter(CatalogConnector):
         return []
 
     @staticmethod
-    def _val(row: Any, keys: List[str], default: Any = None) -> Any:
+    def _val(row: Any, keys: list[str], default: Any = None) -> Any:
         for key in keys:
             try:
                 v = row[key]
@@ -353,12 +354,10 @@ class SimbadTapAdapter(CatalogConnector):
         err_min = self._safe_float(self._val(row, ["coo_err_min", "COO_ERR_MIN"]), 0.5)
         flux_v = self._val(row, ["flux", "FLUX"])
 
-        photometry: List[Photometry] = []
+        photometry: list[Photometry] = []
         if flux_v is not None:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 photometry = [Photometry(magnitude=float(flux_v), band="V")]
-            except (TypeError, ValueError):
-                pass
 
         return Source(
             id=f"SIMBAD_TAP:{main_id}",

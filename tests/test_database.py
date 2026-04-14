@@ -1,5 +1,4 @@
 """Tests for astrobridge.database — SQLite persistence layer."""
-import sqlite3
 
 import pytest
 

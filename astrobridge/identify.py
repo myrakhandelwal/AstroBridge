@@ -6,10 +6,10 @@ import json
 from dataclasses import dataclass
 from typing import Optional
 
+from astrobridge.models import UnifiedObject
 from astrobridge.routing import NLPQueryRouter
 from astrobridge.routing.base import CatalogType, ObjectClass
 from astrobridge.routing.intelligent import CatalogRanker
-from astrobridge.models import UnifiedObject
 
 OBJECT_DESCRIPTIONS: dict[ObjectClass, str] = {
     ObjectClass.STAR: "This looks like a stellar source: a point-like object such as a dwarf, giant, or binary star.",
@@ -213,8 +213,8 @@ async def identify_from_catalogs(
         input_text, object_class, description, search_radius_arcsec,
         top_catalogs, reasoning, catalog_data (UnifiedObject dict or None)
     """
-    from astrobridge.lookup import lookup_object
     from astrobridge.ai_description import generate_description
+    from astrobridge.lookup import lookup_object
 
     # 1. NLP classification (fast, no network)
     base = identify_object(input_text, router=router)

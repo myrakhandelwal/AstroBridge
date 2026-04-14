@@ -1,5 +1,23 @@
 # AstroBridge Release Notes
 
+## Release: April 14, 2026 — v0.3.4 Code Quality
+
+### 📦 Version Information
+- **Version**: 0.3.4 (up from 0.3.3)
+- **Status**: ✅ Production Ready
+- **Tests**: 267 passing (100%)
+- **GitHub Tag**: `v0.3.4`
+
+### ✨ Changes
+
+#### 1. **Lint & Type-Check Fixes**
+- Fixed all 152 ruff lint violations across `astrobridge/`, `astrobridge_complete/`, tests, and demo modules
+  - Modernized type annotations: replaced deprecated `typing.Dict`/`List`/`Optional` with built-in equivalents
+  - Removed unused imports and cleaned up import ordering
+  - Renamed ambiguous single-letter loop variables (`l` → `line`/`lh`)
+  - Simplified control flow with `contextlib.suppress` and ternary operators
+- Fixed 2 mypy `unused-ignore` errors for `pyvo` imports in `connectors.py`
+
 ## Release: April 9, 2026 — v0.3.0 Modernization & Type Safety
 
 ### 📦 Version Information

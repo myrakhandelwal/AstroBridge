@@ -12,7 +12,7 @@ from astrobridge.analytics import AnalyticsEvent, AnalyticsStore
 from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
 from astrobridge.benchmarking import BenchmarkConfig, BenchmarkRunner
 from astrobridge.connectors import CatalogConnector
-from astrobridge.identify import identify_from_catalogs, identify_object
+from astrobridge.identify import identify_from_catalogs
 from astrobridge.jobs import JobManager
 from astrobridge.matching import BayesianMatcher
 from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty

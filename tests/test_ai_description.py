@@ -1,16 +1,16 @@
 """Tests for astrobridge.ai_description — LLM-backed object descriptions."""
-import sqlite3
+
+from datetime import datetime
 
 import pytest
 
 from astrobridge.ai_description import (
-    _BACKENDS,
     _build_prompt,
     _cache_key,
     _call_stub,
     generate_description,
 )
-from astrobridge.database import init_db, upsert_object
+from astrobridge.database import init_db
 from astrobridge.models import (
     Coordinate,
     Photometry,
@@ -18,8 +18,6 @@ from astrobridge.models import (
     Source,
     UnifiedObject,
 )
-from datetime import datetime
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -151,7 +149,7 @@ def test_generate_description_force_refresh(tmp_path, monkeypatch):
     conn = init_db(db_path)
     obj = _make_unified()
     # First call
-    d1 = generate_description(obj, conn=conn)
+    generate_description(obj, conn=conn)
     # Force-refresh: should still return a string
     d2 = generate_description(obj, conn=conn, force_refresh=True)
     assert isinstance(d2, str)

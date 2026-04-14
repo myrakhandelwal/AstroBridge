@@ -49,6 +49,7 @@ def _name_resolvers(live: bool) -> list:
     if live:
         try:
             import pyvo  # noqa: F401  # type: ignore[import-untyped]
+
             from astrobridge.connectors import NedTapAdapter, SimbadTapAdapter
             return [SimbadTapAdapter(), NedTapAdapter()]
         except (ImportError, RuntimeError):
@@ -63,6 +64,7 @@ def _position_enrichers(live: bool) -> list:
         return []
     try:
         import pyvo  # noqa: F401  # type: ignore[import-untyped]
+
         from astrobridge.connectors import GaiaDR3TapAdapter, TwoMassTapAdapter
         return [GaiaDR3TapAdapter(), TwoMassTapAdapter()]
     except (ImportError, RuntimeError):

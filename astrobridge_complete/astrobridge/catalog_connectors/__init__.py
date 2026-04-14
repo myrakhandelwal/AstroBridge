@@ -7,7 +7,7 @@ own retry/timeout logic; callers only see clean results or exceptions.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import Optional
 
 from astrobridge.models import Source
 
@@ -25,14 +25,14 @@ class CatalogConnector(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def query_object(self, name: str) -> List[Source]:
+    async def query_object(self, name: str) -> list[Source]:
         """Async name-based lookup returning all matching sources."""
         raise NotImplementedError
 
     @abstractmethod
     async def cone_search(
         self, ra: float, dec: float, radius_arcsec: float
-    ) -> List[Source]:
+    ) -> list[Source]:
         """Return all sources within *radius_arcsec* of (ra, dec)."""
         raise NotImplementedError
 

@@ -6,9 +6,8 @@ Tests the interactive demo functionality, user input handling, and various query
 
 import asyncio
 from datetime import datetime
+
 import pytest
-from io import StringIO
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
 from astrobridge.api.schemas import CoordinateRequest
@@ -288,7 +287,7 @@ class TestObjectIdentification:
 
     def test_identify_format(self) -> None:
         """Test formatting of identification result."""
-        from astrobridge.identify import identify_object, format_identification
+        from astrobridge.identify import format_identification, identify_object
 
         result = identify_object("Sirius")
         formatted = format_identification(result)

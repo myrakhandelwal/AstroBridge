@@ -115,12 +115,9 @@ class BayesianMatcher(Matcher):
             # P(no_match | data) ∝ (1 - prior) * 1/N  (uniform null)
             prior = self.prior_match_prob
             null_mass = max(0.0, 1.0 - prior)
-            unnorm = [l * prior for l in likelihoods]
+            unnorm = [lh * prior for lh in likelihoods]
             total = sum(unnorm) + null_mass
-            if total > 0:
-                posteriors = [u / total for u in unnorm]
-            else:
-                posteriors = [0.0] * len(unnorm)
+            posteriors = [u / total for u in unnorm] if total > 0 else [0.0] * len(unnorm)
 
             best_local = int(np.argmax(posteriors))
             best_prob = posteriors[best_local]
@@ -189,9 +186,9 @@ class BayesianMatcher(Matcher):
         Used for unit testing and inspection.  For multi-candidate matching,
         use ``match()`` which normalises over the full candidate set.
         """
-        l = self._likelihood(source_ref, source_candidate, target_epoch=target_epoch)
+        lh = self._likelihood(source_ref, source_candidate, target_epoch=target_epoch)
         prior = self.prior_match_prob
-        unnorm = l * prior
+        unnorm = lh * prior
         total = unnorm + (1.0 - prior)
         return float(unnorm / total) if total > 0 else 0.0
 
