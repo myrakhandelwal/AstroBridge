@@ -203,7 +203,7 @@ asyncio.run(main())
 ## Supported Catalogs
 
 | Catalog | Live Adapter |  Best For |
-|---------|-------------|-------------|-------------|----------|
+|---------|-------------|----------|
 | SIMBAD | `SimbadTapAdapter` | All objects, name resolution |
 | NED | `NedTapAdapter` | Galaxies, AGN, quasars |
 | Gaia DR3 | `GaiaDR3TapAdapter` | Stars: astrometry + proper motions |
