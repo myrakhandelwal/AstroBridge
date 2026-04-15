@@ -3,6 +3,8 @@ from typing import Any
 
 from astrobridge.models import ObjectType
 
+__all__ = ["MatcherConfig", "ObjectType"]
+
 
 class MatcherConfig:
     """Configuration for probabilistic matcher by object type."""
