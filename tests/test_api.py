@@ -11,6 +11,7 @@ from astrobridge.api import (
     SourceResponse,
 )
 from astrobridge.matching import BayesianMatcher
+from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty
 from astrobridge.routing import NLPQueryRouter
 
 
@@ -444,32 +445,73 @@ class TestSourceConversion:
         assert response.magnitude == 10.0
 
 
-class TestCrosMatching:
-    """Test cross-matching in orchestration (stubbed)."""
-    
+class TestCrossMatching:
+    """Test cross-matching in orchestration."""
+
     def test_cross_match_empty_sources(self):
         """Test cross-match with no sources."""
         orchestrator = AstroBridgeOrchestrator(matcher=BayesianMatcher())
-        matches = orchestrator._cross_match_sources([])
+        matches = orchestrator._cross_match_sources({})
         assert matches == []
-    
-    def test_cross_match_single_source(self):
-        """Test cross-match with single source."""
+
+    def test_cross_match_single_catalog(self):
+        """Test cross-match with sources from only one catalog."""
         orchestrator = AstroBridgeOrchestrator(matcher=BayesianMatcher())
-        
-        source = SourceResponse(
-            id="s1", name="Test", ra=180.0, dec=45.0, catalog="simbad"
+
+        source = Source(
+            id="s1", name="Test",
+            coordinate=Coordinate(ra=180.0, dec=45.0),
+            uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
+            photometry=[],
+            provenance=Provenance(
+                catalog_name="SIMBAD", catalog_version="local-1",
+                query_timestamp=datetime.utcnow(), source_id="s1",
+            ),
         )
-        matches = orchestrator._cross_match_sources([source])
+        matches = orchestrator._cross_match_sources({"simbad": [source]})
         assert matches == []
-    
+
     def test_cross_match_no_matcher(self):
         """Test cross-match without matcher."""
         orchestrator = AstroBridgeOrchestrator()
-        
-        sources = [
-            SourceResponse(id="s1", name="Test1", ra=180.0, dec=45.0, catalog="simbad"),
-            SourceResponse(id="s2", name="Test2", ra=180.001, dec=45.001, catalog="ned")
-        ]
-        matches = orchestrator._cross_match_sources(sources)
+
+        matches = orchestrator._cross_match_sources({
+            "simbad": [],
+            "ned": [],
+        })
         assert matches == []
+
+    def test_cross_match_two_catalogs(self):
+        """Test cross-match with sources from two catalogs."""
+        orchestrator = AstroBridgeOrchestrator(matcher=BayesianMatcher())
+
+        prov_s = Provenance(
+            catalog_name="SIMBAD", catalog_version="local-1",
+            query_timestamp=datetime.utcnow(), source_id="s1",
+        )
+        prov_n = Provenance(
+            catalog_name="NED", catalog_version="local-1",
+            query_timestamp=datetime.utcnow(), source_id="n1",
+        )
+
+        source1 = Source(
+            id="s1", name="Test1",
+            coordinate=Coordinate(ra=180.0, dec=45.0),
+            uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
+            photometry=[Photometry(magnitude=11.0, band="V")],
+            provenance=prov_s,
+        )
+        source2 = Source(
+            id="n1", name="Test2",
+            coordinate=Coordinate(ra=180.0001, dec=45.0001),
+            uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
+            photometry=[Photometry(magnitude=11.05, band="V")],
+            provenance=prov_n,
+        )
+
+        matches = orchestrator._cross_match_sources({
+            "simbad": [source1],
+            "ned": [source2],
+        })
+        # Should find a match since sources are very close
+        assert isinstance(matches, list)

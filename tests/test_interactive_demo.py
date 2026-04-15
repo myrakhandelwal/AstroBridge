@@ -374,7 +374,7 @@ class TestMatcherControls:
             name="Proxima Centauri",
             auto_route=True,
             proper_motion_aware=True,
-            match_epoch=2015.5,
+            match_epoch=datetime(2015, 7, 2),
         )
 
         response = await orchestrator.execute_query(request)

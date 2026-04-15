@@ -276,35 +276,62 @@ class NLPQueryRouter(QueryRouter):
         logger.info(f"Routing decision: {reasoning}")
         return decision
     
+    # Negation patterns that flip a keyword match to UNKNOWN
+    _NEGATION_RE = re.compile(
+        r"\b(?:not\s+(?:a\s+)?|non[- ]?|exclude\s+|excluding\s+|without\s+|isn'?t\s+(?:a\s+)?|no\s+)",
+        re.IGNORECASE,
+    )
+
     def classify_object(self, query: str) -> ObjectClass:
         """
         Classify object type from query string.
-        
+
+        Handles negation patterns such as "not a star" or "non-stellar"
+        by checking whether the matched keyword sits inside a negation
+        phrase. If every match for a class is negated, that class is
+        skipped.
+
         Args:
             query: Query string
-            
+
         Returns:
             ObjectClass classification
         """
         query_lower = query.lower()
-        
-        # Check each classification in order
-        if any(kw in query_lower for kw in self.SNE_KEYWORDS):
-            return ObjectClass.SNE
-        if any(kw in query_lower for kw in self.QUASAR_KEYWORDS):
-            return ObjectClass.QUASAR
-        if any(kw in query_lower for kw in self.AGN_KEYWORDS):
-            return ObjectClass.AGN
-        if any(kw in query_lower for kw in self.GALAXY_KEYWORDS):
-            return ObjectClass.GALAXY
-        if any(kw in query_lower for kw in self.CLUSTER_KEYWORDS):
-            return ObjectClass.CLUSTER
-        if any(kw in query_lower for kw in self.NEBULA_KEYWORDS):
-            return ObjectClass.NEBULA
-        if any(kw in query_lower for kw in self.STAR_KEYWORDS):
-            return ObjectClass.STAR
-        
+
+        keyword_groups: list[tuple[ObjectClass, list[str]]] = [
+            (ObjectClass.SNE, self.SNE_KEYWORDS),
+            (ObjectClass.QUASAR, self.QUASAR_KEYWORDS),
+            (ObjectClass.AGN, self.AGN_KEYWORDS),
+            (ObjectClass.GALAXY, self.GALAXY_KEYWORDS),
+            (ObjectClass.CLUSTER, self.CLUSTER_KEYWORDS),
+            (ObjectClass.NEBULA, self.NEBULA_KEYWORDS),
+            (ObjectClass.STAR, self.STAR_KEYWORDS),
+        ]
+
+        for obj_class, keywords in keyword_groups:
+            if self._has_unnegated_match(query_lower, keywords):
+                return obj_class
+
         return ObjectClass.UNKNOWN
+
+    def _has_unnegated_match(self, query_lower: str, keywords: list[str]) -> bool:
+        """Return True if at least one keyword matches without being negated."""
+        for kw in keywords:
+            start = 0
+            while True:
+                idx = query_lower.find(kw, start)
+                if idx == -1:
+                    break
+                # Check whether a negation phrase immediately precedes the keyword
+                prefix = query_lower[:idx]
+                match = self._NEGATION_RE.search(prefix)
+                if match and match.end() == idx:
+                    # This keyword occurrence is negated — try next occurrence
+                    start = idx + len(kw)
+                    continue
+                return True
+        return False
     
     def rank_catalogs(
         self,

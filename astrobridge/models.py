@@ -1,8 +1,24 @@
 """Data models for astronomical sources."""
 from datetime import datetime
+from enum import Enum
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+
+
+class ObjectType(str, Enum):
+    """Canonical classification of astronomical objects.
+
+    Used by both the routing layer and the matcher configuration layer.
+    """
+    STAR = "star"
+    GALAXY = "galaxy"
+    QUASAR = "quasar"
+    AGN = "agn"
+    NEBULA = "nebula"
+    CLUSTER = "cluster"
+    SNE = "sne"
+    UNKNOWN = "unknown"
 
 
 class Coordinate(BaseModel):
@@ -23,6 +39,9 @@ class Uncertainty(BaseModel):
     """Positional uncertainty."""
     ra_error: float = Field(..., description="RA uncertainty in arcseconds")
     dec_error: float = Field(..., description="Dec uncertainty in arcseconds")
+    ra_dec_correlation: Optional[float] = Field(
+        None, description="RA-Dec error correlation coefficient (-1 to 1)"
+    )
 
 
 class Photometry(BaseModel):

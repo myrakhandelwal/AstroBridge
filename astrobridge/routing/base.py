@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Optional
 
+from astrobridge.models import ObjectType
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,16 +36,8 @@ class CatalogType(str, Enum):
     EXOPLANET_ARCHIVE = "exoplanet_archive"  # NASA Exoplanet Archive
 
 
-class ObjectClass(str, Enum):
-    """Classification of astronomical objects."""
-    STAR = "star"
-    GALAXY = "galaxy"
-    QUASAR = "quasar"
-    AGN = "agn"
-    NEBULA = "nebula"
-    CLUSTER = "cluster"
-    SNE = "sne"
-    UNKNOWN = "unknown"
+# Backwards-compatible alias — all code that imports ObjectClass still works.
+ObjectClass = ObjectType
 
 
 class RoutingDecision:

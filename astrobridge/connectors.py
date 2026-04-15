@@ -167,6 +167,42 @@ class SimbadConnector(CatalogConnector):
                 catalog_version="local-1",
             ),
             _build_source(
+                source_id="SIMBAD:SIRIUS",
+                name="Sirius",
+                ra=101.2875,
+                dec=-16.7161,
+                magnitude=-1.46,
+                catalog_name="SIMBAD",
+                catalog_version="local-1",
+            ),
+            _build_source(
+                source_id="SIMBAD:VEGA",
+                name="Vega",
+                ra=279.2347,
+                dec=38.7837,
+                magnitude=0.03,
+                catalog_name="SIMBAD",
+                catalog_version="local-1",
+            ),
+            _build_source(
+                source_id="SIMBAD:BETELGEUSE",
+                name="Betelgeuse",
+                ra=88.7929,
+                dec=7.4071,
+                magnitude=0.42,
+                catalog_name="SIMBAD",
+                catalog_version="local-1",
+            ),
+            _build_source(
+                source_id="SIMBAD:M31",
+                name="M31",
+                ra=10.6847,
+                dec=41.2688,
+                magnitude=3.44,
+                catalog_name="SIMBAD",
+                catalog_version="local-1",
+            ),
+            _build_source(
                 source_id="SIMBAD:FIELDSTAR-1",
                 name="Field Star 180+45",
                 ra=180.0008,
@@ -179,6 +215,15 @@ class SimbadConnector(CatalogConnector):
         self._aliases = {
             "proxcen": "SIMBAD:PROXCEN",
             "proximacentauri": "SIMBAD:PROXCEN",
+            "sirius": "SIMBAD:SIRIUS",
+            "alphacanismajoris": "SIMBAD:SIRIUS",
+            "vega": "SIMBAD:VEGA",
+            "alphalyrae": "SIMBAD:VEGA",
+            "betelgeuse": "SIMBAD:BETELGEUSE",
+            "alphaorionis": "SIMBAD:BETELGEUSE",
+            "m31": "SIMBAD:M31",
+            "andromedagalaxy": "SIMBAD:M31",
+            "ngc224": "SIMBAD:M31",
         }
         self._by_id = {source.id: source for source in self._sources}
     
@@ -235,6 +280,15 @@ class NEDConnector(CatalogConnector):
                 catalog_version="local-1",
             ),
             _build_source(
+                source_id="NED:M31",
+                name="M31",
+                ra=10.6847,
+                dec=41.2688,
+                magnitude=3.44,
+                catalog_name="NED",
+                catalog_version="local-1",
+            ),
+            _build_source(
                 source_id="NED:GAL-18045",
                 name="Galaxy 180+45",
                 ra=180.0010,
@@ -243,10 +297,24 @@ class NEDConnector(CatalogConnector):
                 catalog_name="NED",
                 catalog_version="local-1",
             ),
+            _build_source(
+                source_id="NED:NGC5128",
+                name="NGC 5128",
+                ra=201.3651,
+                dec=-43.0191,
+                magnitude=6.84,
+                catalog_name="NED",
+                catalog_version="local-1",
+            ),
         ]
         self._aliases = {
             "proxcen": "NED:PROXCEN-REF",
             "proximacentauri": "NED:PROXCEN-REF",
+            "m31": "NED:M31",
+            "andromedagalaxy": "NED:M31",
+            "ngc224": "NED:M31",
+            "ngc5128": "NED:NGC5128",
+            "centaurusa": "NED:NGC5128",
         }
         self._by_id = {source.id: source for source in self._sources}
     
@@ -1016,6 +1084,340 @@ class TwoMassTapAdapter(CatalogConnector):
             provenance=Provenance(
                 catalog_name="2MASS",
                 catalog_version="psc-tap-live",
+                query_timestamp=datetime.utcnow(),
+                source_id=main_id,
+            ),
+        )
+
+
+class _BaseTapAdapter(CatalogConnector):
+    """Shared boilerplate for TAP-backed catalog adapters.
+
+    Subclasses must set ``_catalog_label``, ``DEFAULT_TAP_URL`` and
+    implement ``_cone_search_sync`` and ``_row_to_source``.
+    """
+
+    DEFAULT_TAP_URL: str = ""
+    _catalog_label: str = "TAP"
+
+    def __init__(
+        self,
+        tap_url: Optional[str] = None,
+        max_records: int = 50,
+        tap_service: Optional[TapServiceProtocol] = None,
+        request_timeout_sec: float = 15.0,
+        max_retries: int = 2,
+        retry_delay_sec: float = 0.5,
+        max_concurrency: int = 4,
+    ):
+        self.tap_url = tap_url or self.DEFAULT_TAP_URL
+        self.max_records = max_records
+        self.request_timeout_sec = request_timeout_sec
+        self.max_retries = max_retries
+        self.retry_delay_sec = retry_delay_sec
+        self._request_semaphore = asyncio.Semaphore(max(1, max_concurrency))
+        self._service: TapServiceProtocol
+
+        if tap_service is not None:
+            self._service = tap_service
+            return
+
+        try:
+            import pyvo as _pyvo
+        except ImportError as exc:
+            raise RuntimeError(
+                f"{type(self).__name__} requires pyvo. Install with `pip install -e .[live]`."
+            ) from exc
+
+        self._service = _pyvo.dal.TAPService(self.tap_url)
+
+    def query(self, name: str) -> Optional[Source]:
+        return None  # Most photometric catalogs lack name indexes
+
+    async def query_object(self, name: str) -> list[Source]:
+        return []
+
+    async def cone_search(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
+        try:
+            return await self._run_io_bound(self._cone_search_sync, coordinate, radius_arcsec)
+        except asyncio.TimeoutError:
+            logger.warning(
+                "%s TAP cone search timed out at RA=%s Dec=%s",
+                self._catalog_label, coordinate.ra, coordinate.dec,
+            )
+            return []
+
+    async def _run_io_bound(self, func: Callable[..., _T], *args: Any) -> _T:
+        async with self._request_semaphore:
+            return await asyncio.wait_for(
+                asyncio.to_thread(func, *args),
+                timeout=self.request_timeout_sec,
+            )
+
+    def _search_with_retries(self, adql: str, context: str) -> list[Any]:
+        for attempt in range(self.max_retries + 1):
+            try:
+                return list(self._service.search(adql))
+            except Exception as exc:
+                if attempt == self.max_retries:
+                    logger.warning("%s TAP %s failed after retries: %s", self._catalog_label, context, exc)
+                    return []
+                time.sleep(self.retry_delay_sec)
+        return []
+
+    @staticmethod
+    def _value(row: Any, keys: list[str], default: Any = None) -> Any:
+        for key in keys:
+            try:
+                v = row[key]
+                if v is not None:
+                    return v
+            except (KeyError, TypeError):
+                pass
+            v = getattr(row, key, None)
+            if v is not None:
+                return v
+        return default
+
+    @staticmethod
+    def _safe_float(value: Any, default: float) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _cone_search_sync(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
+        raise NotImplementedError
+
+    def _row_to_source(self, row: Any) -> Source:
+        raise NotImplementedError
+
+
+class SdssTapAdapter(_BaseTapAdapter):
+    """Live SDSS adapter via the CasJobs/SkyServer TAP service.
+
+    Queries the SDSS PhotoObjAll table for u/g/r/i/z photometry.
+    Name lookups are not supported — use coordinates from SIMBAD/NED.
+    """
+
+    DEFAULT_TAP_URL = "https://skyserver.sdss.org/CasJobs/TapService"
+    _catalog_label = "SDSS"
+
+    def _cone_search_sync(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
+        if radius_arcsec <= 0:
+            return []
+        radius_deg = radius_arcsec / 3600.0
+        adql = f"""
+            SELECT TOP {int(self.max_records)}
+                objid AS main_id,
+                ra, dec, raErr, decErr,
+                psfMag_u, psfMag_g, psfMag_r, psfMag_i, psfMag_z,
+                type
+            FROM PhotoObjAll
+            WHERE 1 = CONTAINS(
+                POINT('ICRS', ra, dec),
+                CIRCLE('ICRS', {coordinate.ra}, {coordinate.dec}, {radius_deg})
+            )
+            ORDER BY psfMag_r
+        """
+        rows = self._search_with_retries(adql, "SDSS cone search")
+        return [self._row_to_source(row) for row in rows]
+
+    def _row_to_source(self, row: Any) -> Source:
+        main_id = str(self._value(row, ["main_id", "objid", "OBJID"], "SDSS_UNKNOWN")).strip()
+        ra = self._safe_float(self._value(row, ["ra", "RA"], 0.0), 0.0)
+        dec = self._safe_float(self._value(row, ["dec", "DEC"], 0.0), 0.0)
+        ra_err = self._safe_float(self._value(row, ["raErr", "RAERR"], None), 0.5)
+        dec_err = self._safe_float(self._value(row, ["decErr", "DECERR"], None), 0.5)
+
+        photometry = []
+        for band, key in [("u", "psfMag_u"), ("g", "psfMag_g"), ("r", "psfMag_r"),
+                          ("i", "psfMag_i"), ("z", "psfMag_z")]:
+            val = self._value(row, [key, key.upper()], None)
+            if val is not None:
+                with contextlib.suppress(TypeError, ValueError):
+                    photometry.append(Photometry(magnitude=float(val), band=band, magnitude_error=None))
+
+        return Source(
+            id=f"SDSS:{main_id}",
+            name=f"SDSS {main_id}",
+            coordinate=Coordinate(ra=ra, dec=dec),
+            uncertainty=Uncertainty(ra_error=ra_err, dec_error=dec_err),
+            photometry=photometry,
+            provenance=Provenance(
+                catalog_name="SDSS",
+                catalog_version="dr18-tap-live",
+                query_timestamp=datetime.utcnow(),
+                source_id=main_id,
+            ),
+        )
+
+
+class WiseTapAdapter(_BaseTapAdapter):
+    """Live WISE/AllWISE adapter via NASA IRSA TAP service.
+
+    Queries the AllWISE source catalog for W1/W2/W3/W4 photometry.
+    """
+
+    DEFAULT_TAP_URL = "https://irsa.ipac.caltech.edu/TAP"
+    _catalog_label = "WISE"
+
+    def _cone_search_sync(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
+        if radius_arcsec <= 0:
+            return []
+        radius_deg = radius_arcsec / 3600.0
+        adql = f"""
+            SELECT TOP {int(self.max_records)}
+                designation AS main_id,
+                ra, dec, sigra, sigdec,
+                w1mpro, w2mpro, w3mpro, w4mpro
+            FROM allwise_p3as_psd
+            WHERE 1 = CONTAINS(
+                POINT('ICRS', ra, dec),
+                CIRCLE('ICRS', {coordinate.ra}, {coordinate.dec}, {radius_deg})
+            )
+            ORDER BY w1mpro
+        """
+        rows = self._search_with_retries(adql, "WISE cone search")
+        return [self._row_to_source(row) for row in rows]
+
+    def _row_to_source(self, row: Any) -> Source:
+        main_id = str(self._value(row, ["main_id", "designation", "DESIGNATION"], "WISE_UNKNOWN")).strip()
+        ra = self._safe_float(self._value(row, ["ra", "RA"], 0.0), 0.0)
+        dec = self._safe_float(self._value(row, ["dec", "DEC"], 0.0), 0.0)
+        ra_err = self._safe_float(self._value(row, ["sigra", "SIGRA"], None), 0.5)
+        dec_err = self._safe_float(self._value(row, ["sigdec", "SIGDEC"], None), 0.5)
+
+        photometry = []
+        for band, key in [("W1", "w1mpro"), ("W2", "w2mpro"), ("W3", "w3mpro"), ("W4", "w4mpro")]:
+            val = self._value(row, [key, key.upper()], None)
+            if val is not None:
+                with contextlib.suppress(TypeError, ValueError):
+                    photometry.append(Photometry(magnitude=float(val), band=band, magnitude_error=None))
+
+        return Source(
+            id=f"WISE:{main_id}",
+            name=main_id,
+            coordinate=Coordinate(ra=ra, dec=dec),
+            uncertainty=Uncertainty(ra_error=ra_err, dec_error=dec_err),
+            photometry=photometry,
+            provenance=Provenance(
+                catalog_name="WISE",
+                catalog_version="allwise-tap-live",
+                query_timestamp=datetime.utcnow(),
+                source_id=main_id,
+            ),
+        )
+
+
+class PanstarrsTapAdapter(_BaseTapAdapter):
+    """Live Pan-STARRS1 adapter via the MAST TAP service.
+
+    Queries the Pan-STARRS1 DR2 MeanObject table for g/r/i/z/y photometry.
+    """
+
+    DEFAULT_TAP_URL = "https://catalogs.mast.stsci.edu/api/v0.1/panstarrs"
+    _catalog_label = "PanSTARRS"
+
+    def _cone_search_sync(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
+        if radius_arcsec <= 0:
+            return []
+        radius_deg = radius_arcsec / 3600.0
+        adql = f"""
+            SELECT TOP {int(self.max_records)}
+                CAST(objID AS VARCHAR) AS main_id,
+                raMean AS ra, decMean AS dec,
+                raMeanErr, decMeanErr,
+                gMeanPSFMag, rMeanPSFMag, iMeanPSFMag,
+                zMeanPSFMag, yMeanPSFMag
+            FROM dbo.MeanObjectView
+            WHERE 1 = CONTAINS(
+                POINT('ICRS', raMean, decMean),
+                CIRCLE('ICRS', {coordinate.ra}, {coordinate.dec}, {radius_deg})
+            )
+            ORDER BY rMeanPSFMag
+        """
+        rows = self._search_with_retries(adql, "PanSTARRS cone search")
+        return [self._row_to_source(row) for row in rows]
+
+    def _row_to_source(self, row: Any) -> Source:
+        main_id = str(self._value(row, ["main_id", "objID", "OBJID"], "PS1_UNKNOWN")).strip()
+        ra = self._safe_float(self._value(row, ["ra", "raMean", "RA"], 0.0), 0.0)
+        dec = self._safe_float(self._value(row, ["dec", "decMean", "DEC"], 0.0), 0.0)
+        ra_err = self._safe_float(self._value(row, ["raMeanErr", "RAMEANERR"], None), 0.3)
+        dec_err = self._safe_float(self._value(row, ["decMeanErr", "DECMEANERR"], None), 0.3)
+
+        photometry = []
+        for band, key in [("g", "gMeanPSFMag"), ("r", "rMeanPSFMag"), ("i", "iMeanPSFMag"),
+                          ("z", "zMeanPSFMag"), ("y", "yMeanPSFMag")]:
+            val = self._value(row, [key, key.upper()], None)
+            if val is not None:
+                with contextlib.suppress(TypeError, ValueError):
+                    photometry.append(Photometry(magnitude=float(val), band=band, magnitude_error=None))
+
+        return Source(
+            id=f"PS1:{main_id}",
+            name=f"PS1 {main_id}",
+            coordinate=Coordinate(ra=ra, dec=dec),
+            uncertainty=Uncertainty(ra_error=ra_err, dec_error=dec_err),
+            photometry=photometry,
+            provenance=Provenance(
+                catalog_name="PanSTARRS",
+                catalog_version="dr2-tap-live",
+                query_timestamp=datetime.utcnow(),
+                source_id=main_id,
+            ),
+        )
+
+
+class ZtfTapAdapter(_BaseTapAdapter):
+    """Live Zwicky Transient Facility adapter via IRSA TAP service.
+
+    Queries the ZTF objects table for g/r/i photometry.
+    """
+
+    DEFAULT_TAP_URL = "https://irsa.ipac.caltech.edu/TAP"
+    _catalog_label = "ZTF"
+
+    def _cone_search_sync(self, coordinate: Coordinate, radius_arcsec: float) -> list[Source]:
+        if radius_arcsec <= 0:
+            return []
+        radius_deg = radius_arcsec / 3600.0
+        adql = f"""
+            SELECT TOP {int(self.max_records)}
+                oid AS main_id,
+                ra, dec,
+                meanmag
+            FROM ztf_objects_dr22
+            WHERE 1 = CONTAINS(
+                POINT('ICRS', ra, dec),
+                CIRCLE('ICRS', {coordinate.ra}, {coordinate.dec}, {radius_deg})
+            )
+            ORDER BY meanmag
+        """
+        rows = self._search_with_retries(adql, "ZTF cone search")
+        return [self._row_to_source(row) for row in rows]
+
+    def _row_to_source(self, row: Any) -> Source:
+        main_id = str(self._value(row, ["main_id", "oid", "OID"], "ZTF_UNKNOWN")).strip()
+        ra = self._safe_float(self._value(row, ["ra", "RA"], 0.0), 0.0)
+        dec = self._safe_float(self._value(row, ["dec", "DEC"], 0.0), 0.0)
+
+        photometry = []
+        meanmag = self._value(row, ["meanmag", "MEANMAG"], None)
+        if meanmag is not None:
+            with contextlib.suppress(TypeError, ValueError):
+                photometry.append(Photometry(magnitude=float(meanmag), band="ZTF", magnitude_error=None))
+
+        return Source(
+            id=f"ZTF:{main_id}",
+            name=f"ZTF {main_id}",
+            coordinate=Coordinate(ra=ra, dec=dec),
+            uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
+            photometry=photometry,
+            provenance=Provenance(
+                catalog_name="ZTF",
+                catalog_version="dr22-tap-live",
                 query_timestamp=datetime.utcnow(),
                 source_id=main_id,
             ),

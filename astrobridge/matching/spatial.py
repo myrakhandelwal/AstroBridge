@@ -1,7 +1,5 @@
 """Spatial indexing for efficient candidate generation."""
 
-import numpy as np
-
 from astrobridge.geometry import angular_distance_deg
 from astrobridge.models import Source
 
@@ -27,12 +25,6 @@ class SpatialIndex:
         if not self.sources:
             self.grid = {}
             return
-        
-        # Extract coordinates
-        np.array([
-            (s.coordinate.ra, s.coordinate.dec) 
-            for s in self.sources
-        ])
         
         # Compute grid cells
         self.ra_min, self.ra_max = 0, 360

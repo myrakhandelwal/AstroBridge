@@ -55,14 +55,14 @@ class WebDemoConnector(CatalogConnector):
         return Source(
             id=f"{self.catalog_name}:{label.lower().replace(' ', '_')}",
             name=label,
-          coordinate=Coordinate(
-            ra=217.429 + offset,
-            dec=-62.680 + offset,
-            pm_ra_mas_per_year=None,
-            pm_dec_mas_per_year=None,
-          ),
+            coordinate=Coordinate(
+                ra=217.429 + offset,
+                dec=-62.680 + offset,
+                pm_ra_mas_per_year=None,
+                pm_dec_mas_per_year=None,
+            ),
             uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
-          photometry=[Photometry(magnitude=11.05 + offset, band="V", magnitude_error=None)],
+            photometry=[Photometry(magnitude=11.05 + offset, band="V", magnitude_error=None)],
             provenance=Provenance(
                 catalog_name=self.catalog_name.upper(),
                 catalog_version="web-demo",
@@ -408,57 +408,57 @@ async def index() -> HTMLResponse:
 
 @app.post("/api/query")
 async def run_query(request: QueryRequest) -> Any:
-  started = datetime.utcnow()
-  response = await orchestrator.execute_query(request)
-  elapsed_ms = (datetime.utcnow() - started).total_seconds() * 1000
-  analytics_store.record(
-    AnalyticsEvent(
-      event_type="query_executed",
-      query_type=request.query_type,
-      user_level=None,
-      success=(response.status != "error"),
-      latency_ms=elapsed_ms,
-      catalog_count=len(response.catalogs_queried),
+    started = datetime.utcnow()
+    response = await orchestrator.execute_query(request)
+    elapsed_ms = (datetime.utcnow() - started).total_seconds() * 1000
+    analytics_store.record(
+        AnalyticsEvent(
+            event_type="query_executed",
+            query_type=request.query_type,
+            user_level=None,
+            success=(response.status != "error"),
+            latency_ms=elapsed_ms,
+            catalog_count=len(response.catalogs_queried),
+        )
     )
-  )
-  return response
+    return response
 
 
 @app.post("/api/identify")
 async def run_identify(request: IdentifyRequest) -> dict[str, Any]:
-  try:
-    result = await identify_from_catalogs(request.input_text)
-  except ValueError as exc:
-    raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        result = await identify_from_catalogs(request.input_text)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-  analytics_store.record(
-    AnalyticsEvent(
-      event_type="identify_executed",
-      query_type="identify",
-      user_level=None,
-      success=True,
-      latency_ms=None,
-      catalog_count=len(result.get("catalog_data", {}).get("catalogs", [])) if result.get("catalog_data") else None,
+    analytics_store.record(
+        AnalyticsEvent(
+            event_type="identify_executed",
+            query_type="identify",
+            user_level=None,
+            success=True,
+            latency_ms=None,
+            catalog_count=len(result.get("catalog_data", {}).get("catalogs", [])) if result.get("catalog_data") else None,
+        )
     )
-  )
 
-  return {"status": "success", **result}
+    return {"status": "success", **result}
 
 
 @app.post("/api/jobs")
 async def submit_job(request: QueryRequest) -> dict[str, str]:
-  job_id = await job_manager.submit_query(request, orchestrator)
-  analytics_store.record(
-    AnalyticsEvent(
-      event_type="job_submitted",
-      query_type=request.query_type,
-      user_level=None,
-      success=True,
-      latency_ms=None,
-      catalog_count=None,
+    job_id = await job_manager.submit_query(request, orchestrator)
+    analytics_store.record(
+        AnalyticsEvent(
+            event_type="job_submitted",
+            query_type=request.query_type,
+            user_level=None,
+            success=True,
+            latency_ms=None,
+            catalog_count=None,
+        )
     )
-  )
-  return {"job_id": job_id, "status": "queued"}
+    return {"job_id": job_id, "status": "queued"}
 
 
 @app.get("/api/jobs/{job_id}")

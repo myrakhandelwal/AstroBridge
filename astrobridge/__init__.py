@@ -4,3 +4,5 @@ try:
     from astrobridge._version import __version__
 except ImportError:
     __version__ = "0.3.0"  # fallback if _version.py not yet generated
+
+from astrobridge.models import ObjectType  # noqa: F401 — canonical enum
