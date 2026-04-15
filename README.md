@@ -202,21 +202,21 @@ asyncio.run(main())
 
 ## Supported Catalogs
 
-| Catalog | Live Adapter | Name Lookup | Cone Search | Best For |
+| Catalog | Live Adapter |  Best For |
 |---------|-------------|-------------|-------------|----------|
-| SIMBAD | `SimbadTapAdapter` | ✅ | ✅ | All objects, name resolution |
-| NED | `NedTapAdapter` | ✅ | ✅ | Galaxies, AGN, quasars |
-| Gaia DR3 | `GaiaDR3TapAdapter` | — | ✅ | Stars: astrometry + proper motions |
-| 2MASS | `TwoMassTapAdapter` | — | ✅ | Stars + galaxies: J/H/Ks photometry |
-| SDSS | routing only | | | Galaxies, QSOs, optical photometry |
-| WISE | routing only | | | Mid-IR sources, AGN |
-| AllWISE | routing only | | | Improved WISE + proper motions |
-| PanSTARRS | routing only | | | Transients, wide-field optical |
-| ZTF | routing only | | | Supernovae, variables, transients |
-| ATLAS | routing only | | | Transient alerts, SNe |
-| Hipparcos | routing only | | | Bright stars (V < 12) |
-| VizieR | routing only | | | Any published catalog table |
-| NASA Exoplanet Archive | routing only | | | Exoplanet host stars |
+| SIMBAD | `SimbadTapAdapter` | All objects, name resolution |
+| NED | `NedTapAdapter` | Galaxies, AGN, quasars |
+| Gaia DR3 | `GaiaDR3TapAdapter` | Stars: astrometry + proper motions |
+| 2MASS | `TwoMassTapAdapter`  | Stars + galaxies: J/H/Ks photometry |
+| SDSS | routing only | Galaxies, QSOs, optical photometry |
+| WISE | routing only | Mid-IR sources, AGN |
+| AllWISE | routing only | Improved WISE + proper motions |
+| PanSTARRS | routing only | Transients, wide-field optical |
+| ZTF | routing only | Supernovae, variables, transients |
+| ATLAS | routing only | Transient alerts, SNe |
+| Hipparcos | routing only | Bright stars (V < 12) |
+| VizieR | routing only | Any published catalog table |
+| NASA Exoplanet Archive | routing only | Exoplanet host stars |
 
 Live adapters require `pip install -e .[live]`.
 
