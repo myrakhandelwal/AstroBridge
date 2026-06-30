@@ -1,450 +1,283 @@
-#!/usr/bin/env python3
+"""AstroBridge demo — runs fully offline, no network or API keys required.
+
+What this covers
+----------------
+1. Build a CelestialObject from raw catalog sources (the from_sources() factory)
+2. Best-source-per-field synthesis  (Gaia owns position, SIMBAD owns classification)
+3. describe() — template-based plain-English summaries for stars, galaxies, unknowns
+4. identify_object() — NLP routing that classifies a query and recommends catalogs
+5. Offline lookup via local connector fallback
+6. Bayesian cross-matching (researcher tool)
+7. Full public API surface
+
+Run it
+------
+    python demo.py
 """
-AstroBridge Demo - Interactive demonstration of all 6 phases
-"""
+
+from __future__ import annotations
 
 import asyncio
 import os
-import tempfile
 from datetime import datetime
 
-from astrobridge.analytics import AnalyticsEvent, AnalyticsStore
-from astrobridge.api import AstroBridgeOrchestrator, QueryRequest
-from astrobridge.benchmarking import BenchmarkConfig, BenchmarkRunner
-from astrobridge.connectors import CatalogConnector
-from astrobridge.identify import format_identification, identify_object
-from astrobridge.jobs import JobManager, JobRecord
-from astrobridge.matching import BayesianMatcher
-from astrobridge.models import Coordinate, Photometry, Provenance, Source, Uncertainty
-from astrobridge.routing import NLPQueryRouter
-from astrobridge.routing.base import CatalogType
+from astrobridge.ai_description import generate_description
+from astrobridge.identify import identify_object
+from astrobridge.models import (
+    CelestialObject,
+    Coordinate,
+    ObjectType,
+    Photometry,
+    Provenance,
+    Source,
+    Uncertainty,
+)
+
+W = 60
+LINE  = "─" * W
+THICK = "═" * W
 
 
-class DemoConnector(CatalogConnector):
-    """Synthetic connector used to keep the demo fully self-contained."""
+# ─────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────
 
-    def __init__(self, catalog_name):
-        self.catalog_name = catalog_name
-
-    def query(self, name):
-        """Return a deterministic synthetic source for the requested object."""
-        offsets = {
-            "simbad": 0.0000,
-            "gaia": 0.0005,
-            "ned": 0.0010,
-            "sdss": -0.0004,
-            "wise": 0.0008,
-            "panstarrs": -0.0007,
-            "ztf": 0.0012,
-            "atlas": -0.0011,
-        }
-
-        offset = offsets.get(self.catalog_name, 0.0)
-        query_label = name.strip() or "Demo Object"
-
-        return Source(
-            id=f"{self.catalog_name}:{query_label.lower().replace(' ', '_')}",
-            name=query_label,
-            coordinate=Coordinate(ra=217.429 + offset, dec=-62.680 + offset),
-            uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
-            photometry=[Photometry(magnitude=11.05 + offset, band="V")],
-            provenance=Provenance(
-                catalog_name=self.catalog_name.upper(),
-                catalog_version="demo",
-                query_timestamp=datetime.now(),
-                source_id=f"{self.catalog_name.upper()}:{query_label}",
-            ),
-        )
+def make_source(
+    catalog: str,
+    name: str,
+    ra: float,
+    dec: float,
+    ra_err: float,
+    dec_err: float,
+    mags: dict,
+    obj_type: str,
+    parallax: float | None = None,
+    redshift: float | None = None,
+) -> Source:
+    """Build a realistic Source as a TAP adapter would return."""
+    return Source(
+        id=f"{catalog}:{name}",
+        name=name,
+        coordinate=Coordinate(ra=ra, dec=dec),
+        uncertainty=Uncertainty(ra_error=ra_err, dec_error=dec_err),
+        photometry=[Photometry(magnitude=m, band=b) for b, m in mags.items()],
+        provenance=Provenance(
+            catalog_name=catalog,
+            catalog_version="2024",
+            query_timestamp=datetime.utcnow(),
+            source_id=name,
+        ),
+        object_type=obj_type,
+        parallax_mas=parallax,
+        redshift=redshift,
+    )
 
 
-def print_section(title: str) -> None:
-    """Print a formatted section header.
-    
-    Args:
-        title: Section title to print.
-    """
+def section(title: str) -> None:
+    print(f"\n{THICK}")
     print(f"  {title}")
+    print(THICK)
 
 
-def demo_phase5_routing() -> None:
-    """Demo Phase 5: Intelligent Query Routing.
-    
-    Demonstrates how the NLP router classifies astronomical targets
-    and ranks catalogs based on object type and query properties.
-    """
-    print_section("PHASE 5: INTELLIGENT QUERY ROUTING")
-    
-    router = NLPQueryRouter()
-    
-    queries = [
-        "Find nearby red dwarf stars",
-        "Search for high-redshift quasars in the infrared",
-        "Look for variable supernovae",
-        "Find planetary nebulae within 100 parsecs",
-        "Search for globular clusters",
-    ]
-    
-    for query in queries:
-        print(f"Query: {query}")
-        decision = router.parse_query(query)
-        
-        print(f"  Object Type: {decision.object_class.value}")
-        print(f"  Search Radius: {decision.search_radius_arcsec} arcsec")
-        print("  Top 3 Catalogs:")
-        
-        for i, (catalog, score) in enumerate(decision.catalog_priority[:3], 1):
-            print(f"    {i}. {catalog.value:12s} (score: {score:.2f})")
-        
-        print(f"  Reasoning: {decision.reasoning}\n")
+def subsection(title: str) -> None:
+    print(f"\n{LINE}")
+    print(f"  {title}")
+    print(LINE)
 
 
-def demo_phase4_matching() -> None:
-    """Demo Phase 4: Probabilistic Matching.
-    
-    Demonstrates the Bayesian matcher's probability calculation
-    for nearby vs distant sources, and shows confidence scoring.
-    """
-    print_section("PHASE 4: PROBABILISTIC BAYESIAN MATCHING")
-    
-    # Create sample sources
-    prov = Provenance(
-        catalog_name="Demo",
-        catalog_version="1.0",
-        query_timestamp=datetime.now(),
-        source_id="DEMO"
-    )
-    
-    source1 = Source(
-        id="proxima-simbad",
-        name="Proxima Centauri",
-        coordinate=Coordinate(ra=217.429, dec=-62.680),
-        uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
-        photometry=[Photometry(magnitude=11.05, band="V")],
-        provenance=prov
-    )
-    
-    source2 = Source(
-        id="proxima-gaia",
-        name="Proxima Cen (Gaia)",
-        coordinate=Coordinate(ra=217.4295, dec=-62.6805),  # 1 arcsec away
-        uncertainty=Uncertainty(ra_error=0.3, dec_error=0.3),
-        photometry=[Photometry(magnitude=11.06, band="G")],
-        provenance=prov
-    )
-    
-    source3 = Source(
-        id="rigel",
-        name="Rigel",
-        coordinate=Coordinate(ra=78.634, dec=8.201),  # Far away
-        uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
-        photometry=[Photometry(magnitude=0.13, band="V")],
-        provenance=prov
-    )
-    
-    matcher = BayesianMatcher()
-    
-    print("Testing match probabilities:\n")
-    
-    # Close sources (should match)
-    prob_close = matcher.calculate_match_probability(source1, source2)
-    print(f"Proxima (SIMBAD) vs Proxima (Gaia): {prob_close:.4f}")
-    print("  → These are the SAME object (nearby, similar magnitudes)")
-    
-    # Far sources (should not match)
-    prob_far = matcher.calculate_match_probability(source1, source3)
-    print(f"\nProxima vs Rigel: {prob_far:.4f}")
-    print("  → These are DIFFERENT objects (far apart, different magnitudes)")
-    
-    # Full matching
-    print("\n\nPerforming full cross-match:")
-    matches = matcher.match([source1], [source2, source3])
-    
-    print(f"Found {len(matches)} match(es):\n")
-    for match in matches:
-        print(f"  Match: {match.source1_id} ↔ {match.source2_id}")
-        print(f"    Probability: {match.match_probability:.4f}")
-        print(f"    Separation: {match.separation_arcsec:.2f} arcsec")
-        print(f"    Confidence: {match.confidence:.2f}\n")
+# ─────────────────────────────────────────────────────────────
+# 1. CelestialObject — build from multi-catalog sources
+# ─────────────────────────────────────────────────────────────
+
+section("1 · CelestialObject.from_sources()  — best-field synthesis")
+
+print("""
+  Two catalogs see Proxima Centauri:
+    SIMBAD   → name + classification (Em*), coarse position (±0.5 mas)
+    Gaia DR3 → precise position (±0.02 mas), proper motion, parallax, GBP/GRP
+""")
+
+simbad = make_source(
+    "SIMBAD", "Proxima Centauri",
+    ra=217.429, dec=-62.680,
+    ra_err=0.5, dec_err=0.5,
+    mags={"V": 11.05, "B": 12.95},
+    obj_type="Em*",
+)
+
+gaia = make_source(
+    "Gaia DR3", "Proxima Centauri",
+    ra=217.42895, dec=-62.67948,
+    ra_err=0.02, dec_err=0.02,
+    mags={"G": 11.13, "BP": 13.02, "RP": 9.55},
+    obj_type="star",
+    parallax=768.5,
+)
+
+proxima = CelestialObject.from_sources([simbad, gaia])
+
+print(f"  primary_name      : {proxima.primary_name}")
+print(f"  object_type       : {proxima.object_type.value}  (classification_source={proxima.classification_source!r})")
+print(f"  RA / Dec          : {proxima.ra:.5f}  {proxima.dec:.5f}  (position_source={proxima.position_source!r})")
+print(f"  parallax          : {proxima.parallax_mas} mas  →  {proxima.distance_pc:.2f} pc  ({proxima.distance_pc * 3.2616:.2f} ly)")
+print(f"  photometry        : {proxima.photometry_summary}")
+print(f"  catalogs          : {proxima.source_catalogs}")
 
 
-async def demo_phase6_orchestration() -> None:
-    """Demo Phase 6: Async Orchestration.
-    
-    Demonstrates end-to-end query execution: routing selection,
-    multi-catalog querying, cross-matching, and confidence scoring.
-    Uses async/await for concurrent catalog access.
-    """
-    print_section("PHASE 6: API ORCHESTRATION")
-    
-    # Create orchestrator with router
-    orchestrator = AstroBridgeOrchestrator()
-    orchestrator.set_router(NLPQueryRouter())
-    orchestrator.set_matcher(BayesianMatcher())
+# ─────────────────────────────────────────────────────────────
+# 2. describe() — plain-English summaries
+# ─────────────────────────────────────────────────────────────
 
-    for catalog in CatalogType:
-        orchestrator.add_connector(catalog.value, DemoConnector(catalog.value))
-    
-    queries = [
-        QueryRequest(
-            query_type="natural_language",
-            description="Find nearby red dwarf stars",
-            auto_route=True
-        ),
-        QueryRequest(
-            query_type="natural_language",
-            description="Search for high-redshift galaxies with infrared data",
-            auto_route=True
-        ),
-        QueryRequest(
-            query_type="natural_language",
-            description="Look for recent supernovae",
-            auto_route=True
-        ),
-    ]
-    
-    for i, query in enumerate(queries, 1):
-        print(f"\nQuery {i}: {query.description}")
-        
-        response = await orchestrator.execute_query(query)
-        
-        print(f"  Query ID: {response.query_id}")
-        print(f"  Status: {response.status}")
-        print(f"  Execution Time: {response.execution_time_ms:.2f}ms")
-        
-        if response.routing_reasoning:
-            print(f"  Routing: {response.routing_reasoning}")
-        
-        print(f"  Catalogs Queried: {response.catalogs_queried}")
-        print(f"  Sources Found: {len(response.sources)}")
-        print(f"  Matches Found: {len(response.matches)}")
-        
-        if response.errors:
-            print(f"  Errors: {response.errors}")
+section("2 · CelestialObject.describe()  — no LLM required")
+
+subsection("2a · Star  (Proxima Centauri)")
+print(f"\n  {proxima.describe()}")
+
+subsection("2b · Galaxy  (M31 / Andromeda)")
+m31 = CelestialObject(
+    primary_name="M31",
+    ra=10.6848,
+    dec=41.2690,
+    object_type=ObjectType.GALAXY,
+    redshift=0.000360,
+    redshift_type="spectroscopic",
+    redshift_source="NED",
+    source_catalogs=["NED", "SIMBAD"],
+    alternate_names=["Andromeda Galaxy", "NGC 224"],
+)
+print(f"\n  {m31.describe()}")
+
+subsection("2c · Quasar  (3C 273)")
+qso = CelestialObject(
+    primary_name="3C 273",
+    ra=187.2779,
+    dec=2.0523,
+    object_type=ObjectType.QUASAR,
+    redshift=0.158,
+    redshift_type="spectroscopic",
+    source_catalogs=["NED", "SDSS"],
+)
+print(f"\n  {qso.describe()}")
+
+subsection("2d · Unknown / unclassified object")
+mystery = CelestialObject(primary_name="J123456.7+654321", ra=188.736, dec=65.722)
+print(f"\n  {mystery.describe()}")
 
 
-def demo_phase7_identification() -> None:
-    """Demo Phase 7: AI-Assisted Object Identification.
-    
-    Shows how the identify_object command classifies astronomical targets
-    by text and returns structured results with descriptions and search hints.
-    """
-    print_section("PHASE 7: AI-ASSISTED OBJECT IDENTIFICATION")
+# ─────────────────────────────────────────────────────────────
+# 3. AI description stub (no API key needed in stub mode)
+# ─────────────────────────────────────────────────────────────
 
-    inputs = [
-        "M31",
-        "Proxima Centauri",
-        "Find nearby red dwarf stars",
-    ]
+section("3 · AI description  (stub — set AI_PROVIDER=anthropic to go live)")
 
-    for item in inputs:
-        result = identify_object(item)
-        print(format_identification(result))
-        print()
+os.environ.setdefault("AI_PROVIDER", "stub")
+
+desc = generate_description(proxima, conn=None)
+print(f"\n  {desc}")
+print(
+    "\n  Tip: set AI_PROVIDER=anthropic and AI_API_KEY=<key> for a real"
+    "\n  Claude-generated paragraph instead of the stub placeholder."
+)
 
 
-def demo_phase8_telemetry_and_jobs() -> None:
-    """Demo Phase 8: Telemetry, Persistence, and Async Jobs.
-    
-    Demonstrates analytics event recording, SQLite-backed persistence,
-    and asynchronous job submission and result retrieval.
-    """
-    print_section("PHASE 8: TELEMETRY, PERSISTENCE, AND ASYNC JOBS")
+# ─────────────────────────────────────────────────────────────
+# 4. identify_object() — NLP routing, no network
+# ─────────────────────────────────────────────────────────────
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        state_db = os.path.join(temp_dir, "state.db")
-        analytics_store = AnalyticsStore(db_path=state_db, persist=True)
-        job_manager = JobManager(db_path=state_db, persist=True)
+section("4 · identify_object()  — NLP routing (offline)")
 
-        analytics_store.record(
-            AnalyticsEvent(
-                event_type="demo_query",
-                query_type="identify",
-                user_level="beginner",
-                success=True,
-                latency_ms=12.4,
-                catalog_count=3,
-                metadata={"demo": True},
-            )
-        )
-        analytics_store.record(
-            AnalyticsEvent(
-                event_type="demo_query",
-                query_type="name",
-                user_level="advanced",
-                success=True,
-                latency_ms=8.6,
-                catalog_count=3,
-                metadata={"demo": True},
-            )
-        )
+queries = [
+    "M31",
+    "Proxima Centauri",
+    "Sirius",
+    "Crab Nebula supernova remnant",
+    "red dwarf stars in solar neighborhood",
+    "gravitational lensing quasar",
+    "open cluster near the Orion arm",
+    "3C 273",
+]
 
-        summary = analytics_store.summary()
-        print("Analytics summary:")
-        print(f"  Total events: {summary['total_events']}")
-        print(f"  Success rate: {summary['query_success_rate']:.2f}")
-        print(f"  Average latency: {summary['average_latency_ms']:.2f} ms")
-
-        persisted_store = AnalyticsStore(db_path=state_db, persist=True)
-        print(f"  Reloaded persisted events: {len(persisted_store.list_events())}")
-
-        record = JobRecord(
-            job_id="demo-job-1",
-            status="completed",
-            created_at=datetime.utcnow(),
-            started_at=datetime.utcnow(),
-            finished_at=datetime.utcnow(),
-            result={"status": "success", "message": "Demo background job completed"},
-        )
-        job_manager._save_record(record)
-        reloaded_job_manager = JobManager(db_path=state_db, persist=True)
-        loaded = reloaded_job_manager.get_job("demo-job-1")
-        print("Background job persistence:")
-        print(f"  Job ID: {loaded.job_id if loaded else 'missing'}")
-        print(f"  Status: {loaded.status if loaded else 'missing'}")
-        print(f"  Result message: {loaded.result['message'] if loaded and loaded.result else 'missing'}")
+radius_hdr = 'Radius"'
+print(f"\n  {'Query':<42} {'Class':<10} {'Top catalogs':<22} {radius_hdr}")
+print(f"  {'─'*42} {'─'*10} {'─'*22} {'─'*7}")
+for q in queries:
+    r = identify_object(q)
+    top2 = ", ".join(r.top_catalogs[:2])
+    print(f"  {q:<42} {r.object_class.value:<10} {top2:<22} {r.search_radius_arcsec:.0f}")
 
 
-async def demo_phase9_benchmarking() -> None:
-    """Demo Phase 9: Reproducible Benchmarking.
-    
-    Runs a multi-iteration benchmark to measure query latency,
-    success rate, and latency percentiles (p50, p95).
-    """
-    print_section("PHASE 9: REPRODUCIBLE BENCHMARKING")
+# ─────────────────────────────────────────────────────────────
+# 5. Offline lookup (local connectors, no pyvo needed)
+# ─────────────────────────────────────────────────────────────
 
-    orchestrator = AstroBridgeOrchestrator()
-    orchestrator.set_router(NLPQueryRouter())
-    orchestrator.set_matcher(BayesianMatcher())
+section("5 · lookup_object()  — offline mode (local connector fallback)")
 
-    for catalog in CatalogType:
-        orchestrator.add_connector(catalog.value, DemoConnector(catalog.value))
+async def demo_lookup() -> None:
+    from astrobridge.lookup import lookup_object, lookup_by_coordinates
 
-    runner = BenchmarkRunner(orchestrator)
-    result = await runner.run(BenchmarkConfig(iterations=9))
+    obj = await lookup_object("Proxima Centauri", live=False)
+    if obj:
+        print(f"\n  lookup_object('Proxima Centauri')")
+        print(f"    name     : {obj.primary_name}")
+        print(f"    type     : {obj.object_type.value}")
+        print(f"    RA / Dec : {obj.ra:.3f}  {obj.dec:.3f}")
+    else:
+        print("\n  (no local result — install pyvo for live queries)")
 
-    print(f"Benchmark iterations: {result['iterations']}")
-    print(f"Success rate: {result['success_rate']:.2f}")
-    print(f"Latency mean: {result['latency_ms']['mean']:.2f} ms")
-    print(f"Latency p50: {result['latency_ms']['p50']:.2f} ms")
-    print(f"Latency p95: {result['latency_ms']['p95']:.2f} ms")
+    results = await lookup_by_coordinates(217.429, -62.680, radius_arcsec=120, live=False)
+    print(f"\n  lookup_by_coordinates(217.43, -62.68, 120\")  →  {len(results)} object(s) found")
+    for r in results:
+        print(f"    {r.primary_name:<28}  RA={r.ra:.3f}  Dec={r.dec:.3f}")
 
-
-def demo_phase2_models() -> None:
-    """Demo Phase 2: Type-Safe Domain Models.
-    
-    Showcases the core Pydantic-based astronomical data models:
-    Coordinate, Uncertainty, Photometry, Provenance, and Source.
-    Demonstrates type safety and field validation.
-    """
-    print_section("PHASE 2: CANONICAL DOMAIN MODELS")
-    
-    print("Creating type-safe astronomical source model:\n")
-    
-    prov = Provenance(
-        catalog_name="SIMBAD",
-        catalog_version="4.2",
-        query_timestamp=datetime.now(),
-        source_id="SIMBAD:*2MASS J13142029-2306008"
-    )
-    
-    source = Source(
-        id="proxima-1",
-        name="Proxima Centauri",
-        coordinate=Coordinate(ra=217.429, dec=-62.680),
-        uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5, ra_dec_correlation=0.0),
-        photometry=[
-            Photometry(magnitude=11.05, band="V"),
-            Photometry(magnitude=8.54, band="K"),
-        ],
-        provenance=prov
-    )
-    
-    print(f"Source ID: {source.id}")
-    print(f"Name: {source.name}")
-    print(f"Coordinates: RA={source.coordinate.ra:.3f}°, Dec={source.coordinate.dec:.3f}°")
-    print(f"Uncertainty: σ_RA={source.uncertainty.ra_error}″, σ_Dec={source.uncertainty.dec_error}″")
-    print("Photometry:")
-    for phot in source.photometry:
-        print(f"  {phot.band}-band: {phot.magnitude:.2f} mag")
-    print(f"Source: {source.provenance.catalog_name} v{source.provenance.catalog_version}")
-    print("\n✓ All fields type-validated by Pydantic")
+asyncio.run(demo_lookup())
 
 
-def main() -> None:
-    """Run all demos sequentially.
-    
-    Executes the complete AstroBridge feature walkthrough:
-    models, routing, matching, orchestration, identification,
-    telemetry & jobs, and benchmarking.
-    """
-    print("\n" + "="*70)
-    print("  ASTROBRIDGE: AI-DRIVEN ASTRONOMICAL SOURCE MATCHING")
-    async def query_object(self, coordinate, search_radius_arcsec):
-        """Async query method for API orchestration compatibility."""
-        offsets = {
-            "simbad": 0.0000,
-            "gaia": 0.0005,
-            "ned": 0.0010,
-            "sdss": -0.0004,
-            "wise": 0.0008,
-            "panstarrs": -0.0007,
-            "ztf": 0.0012,
-            "atlas": -0.0011,
-        }
-        
-        offset = offsets.get(self.catalog_name, 0.0)
-        
-        return [Source(
-            id=f"{self.catalog_name}:demo_object",
-            name="Demo Object",
-            coordinate=Coordinate(ra=coordinate.ra + offset, dec=coordinate.dec + offset),
-            uncertainty=Uncertainty(ra_error=0.5, dec_error=0.5),
-            photometry=[Photometry(magnitude=11.05 + offset, band="V")],
-            provenance=Provenance(
-                catalog_name=self.catalog_name.upper(),
-                catalog_version="demo",
-                query_timestamp=datetime.now(),
-                source_id=f"{self.catalog_name.upper()}:DEMO",
-            ),
-        )]
-    print("="*70)
-    
-    # Phase 2: Models
-    demo_phase2_models()
-    
-    # Phase 5: Routing
-    demo_phase5_routing()
-    
-    # Phase 4: Matching
-    demo_phase4_matching()
-    
-    # Phase 6: Orchestration (async)
-    print_section("PHASE 6: API ORCHESTRATION")
-    print("Running async query orchestration demo...\n")
-    asyncio.run(demo_phase6_orchestration())
+# ─────────────────────────────────────────────────────────────
+# 6. Bayesian cross-matching (researcher tool)
+# ─────────────────────────────────────────────────────────────
 
-    # Phase 7: Identification
-    demo_phase7_identification()
+section("6 · BayesianMatcher  — probabilistic cross-matching")
 
-    # Phase 8: Telemetry, persistence, jobs
-    demo_phase8_telemetry_and_jobs()
+from astrobridge.matching import BayesianMatcher
 
-    # Phase 9: Benchmarking (async)
-    asyncio.run(demo_phase9_benchmarking())
-    
-    # Summary
-    print_section("DEMO COMPLETE")
-    print("✓ Phase 1: Foundation - Infrastructure complete")
-    print("✓ Phase 2: Domain Contracts - Type-safe models demonstrated")
-    print("✓ Phase 3: Connectors - Built-in resilience and caching")
-    print("✓ Phase 4: Probabilistic Matching - Bayesian inference shown")
-    print("✓ Phase 5: Query Routing - NLP classification demonstrated")
-    print("✓ Phase 6: API Orchestration - Async query execution shown")
-    print("✓ Phase 7: AI Identification - Explanatory object descriptions shown")
-    print("✓ Phase 8: Telemetry & Jobs - Persistent analytics and job tracking shown")
-    print("✓ Phase 9: Benchmarking - Reproducible performance measurements shown")
-    print("\nAstroBridge system is fully operational and ready for production!\n")
+ref_sources = [
+    make_source("SIMBAD", "Proxima Centauri", 217.42895, -62.67948, 0.5, 0.5, {"V": 11.05}, "Em*"),
+    make_source("SIMBAD", "Barnard's Star",   269.45208,   4.69339, 0.5, 0.5, {"V":  9.54}, "star"),
+    make_source("SIMBAD", "Wolf 359",         164.12033,   7.00590, 0.5, 0.5, {"V": 13.44}, "star"),
+]
+
+cand_sources = [
+    make_source("Gaia DR3", "source_A",  217.42898, -62.67951, 0.02, 0.02, {"G": 11.13}, "star"),
+    make_source("Gaia DR3", "source_B",  269.45210,   4.69341, 0.02, 0.02, {"G":  9.51}, "star"),
+    make_source("Gaia DR3", "source_C",  164.12037,   7.00591, 0.02, 0.02, {"G": 13.40}, "star"),
+    make_source("Gaia DR3", "unrelated",  45.0,       30.0,    0.02, 0.02, {"G": 15.00}, "star"),
+]
+
+matcher = BayesianMatcher(proper_motion_aware=False)
+matches = matcher.match(ref_sources, cand_sources)
+
+print(f"\n  {len(ref_sources)} SIMBAD sources × {len(cand_sources)} Gaia sources  →  {len(matches)} match(es)\n")
+sep_hdr = 'sep"'
+print(f"  {'Ref':<24} {'Candidate':<16} {'p':>6}  {sep_hdr:>6}")
+print(f"  {'─'*24} {'─'*16} {'─'*6}  {'─'*6}")
+for m in sorted(matches, key=lambda x: -x.match_probability):
+    print(f"  {m.source1_id:<24} {m.source2_id:<16} {m.match_probability:>6.3f}  {m.separation_arcsec:>6.3f}")
 
 
-if __name__ == "__main__":
-    main()
+# ─────────────────────────────────────────────────────────────
+# 7. Public API surface
+# ─────────────────────────────────────────────────────────────
+
+section("7 · Public API  (import astrobridge)")
+
+import astrobridge
+
+print(f"\n  version : {astrobridge.__version__}\n")
+for name in astrobridge.__all__:
+    attr = getattr(astrobridge, name)
+    kind = type(attr).__name__
+    print(f"  astrobridge.{name:<22}  [{kind}]")
+
+print(f"\n{THICK}")
+print("  Demo complete — all sections passed ✓")
+print(THICK + "\n")

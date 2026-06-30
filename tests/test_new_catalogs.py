@@ -111,61 +111,49 @@ def gaia_adapter():
     return GaiaDR3TapAdapter(tap_service=StaticTapService(GAIA_ROWS))
 
 
-def test_gaia_query_object_returns_empty(gaia_adapter):
-    result = asyncio.get_event_loop().run_until_complete(
-        gaia_adapter.query_object("Proxima Centauri")
-    )
+async def test_gaia_query_object_returns_empty(gaia_adapter):
+    result = await gaia_adapter.query_object("Proxima Centauri")
     assert result == []
 
 
-def test_gaia_cone_search_returns_sources(gaia_adapter):
+async def test_gaia_cone_search_returns_sources(gaia_adapter):
     coord = Coordinate(ra=217.429, dec=-62.680)
-    result = asyncio.get_event_loop().run_until_complete(
-        gaia_adapter.cone_search(coord, radius_arcsec=30)
-    )
+    result = await gaia_adapter.cone_search(coord, radius_arcsec=30)
     assert len(result) == 1
     src = result[0]
     assert src.provenance.catalog_name == "GAIA_DR3"
     assert src.id.startswith("GAIA_DR3:")
 
 
-def test_gaia_cone_search_includes_proper_motion(gaia_adapter):
+async def test_gaia_cone_search_includes_proper_motion(gaia_adapter):
     coord = Coordinate(ra=217.429, dec=-62.680)
-    result = asyncio.get_event_loop().run_until_complete(
-        gaia_adapter.cone_search(coord, radius_arcsec=30)
-    )
+    result = await gaia_adapter.cone_search(coord, radius_arcsec=30)
     src = result[0]
     assert src.coordinate.pm_ra_mas_per_year == pytest.approx(-3775.4)
     assert src.coordinate.pm_dec_mas_per_year == pytest.approx(765.5)
 
 
-def test_gaia_cone_search_includes_gbrp_photometry(gaia_adapter):
+async def test_gaia_cone_search_includes_gbrp_photometry(gaia_adapter):
     coord = Coordinate(ra=217.429, dec=-62.680)
-    result = asyncio.get_event_loop().run_until_complete(
-        gaia_adapter.cone_search(coord, radius_arcsec=30)
-    )
+    result = await gaia_adapter.cone_search(coord, radius_arcsec=30)
     bands = {p.band for p in result[0].photometry}
     assert "G" in bands
     assert "BP" in bands
     assert "RP" in bands
 
 
-def test_gaia_cone_search_zero_radius_returns_empty(gaia_adapter):
+async def test_gaia_cone_search_zero_radius_returns_empty(gaia_adapter):
     coord = Coordinate(ra=0.0, dec=0.0)
-    result = asyncio.get_event_loop().run_until_complete(
-        gaia_adapter.cone_search(coord, radius_arcsec=0)
-    )
+    result = await gaia_adapter.cone_search(coord, radius_arcsec=0)
     assert result == []
 
 
-def test_gaia_tap_error_returns_empty():
+async def test_gaia_tap_error_returns_empty():
     bad_service = StaticTapService([])
     bad_service.search = MagicMock(side_effect=RuntimeError("TAP error"))
     adapter = GaiaDR3TapAdapter(tap_service=bad_service, max_retries=0)
     coord = Coordinate(ra=0.0, dec=0.0)
-    result = asyncio.get_event_loop().run_until_complete(
-        adapter.cone_search(coord, radius_arcsec=30)
-    )
+    result = await adapter.cone_search(coord, radius_arcsec=30)
     assert result == []
 
 
@@ -199,51 +187,41 @@ def twomass_adapter():
     return TwoMassTapAdapter(tap_service=StaticTapService(TWOMASS_ROWS))
 
 
-def test_twomass_query_object_returns_empty(twomass_adapter):
-    result = asyncio.get_event_loop().run_until_complete(
-        twomass_adapter.query_object("Antares")
-    )
+async def test_twomass_query_object_returns_empty(twomass_adapter):
+    result = await twomass_adapter.query_object("Antares")
     assert result == []
 
 
-def test_twomass_cone_search_returns_sources(twomass_adapter):
+async def test_twomass_cone_search_returns_sources(twomass_adapter):
     coord = Coordinate(ra=254.335, dec=-26.032)
-    result = asyncio.get_event_loop().run_until_complete(
-        twomass_adapter.cone_search(coord, radius_arcsec=30)
-    )
+    result = await twomass_adapter.cone_search(coord, radius_arcsec=30)
     assert len(result) == 1
     src = result[0]
     assert src.provenance.catalog_name == "2MASS"
     assert src.id.startswith("2MASS:")
 
 
-def test_twomass_cone_search_jhks_photometry(twomass_adapter):
+async def test_twomass_cone_search_jhks_photometry(twomass_adapter):
     coord = Coordinate(ra=254.335, dec=-26.032)
-    result = asyncio.get_event_loop().run_until_complete(
-        twomass_adapter.cone_search(coord, radius_arcsec=30)
-    )
+    result = await twomass_adapter.cone_search(coord, radius_arcsec=30)
     bands = {p.band for p in result[0].photometry}
     assert "J" in bands
     assert "H" in bands
     assert "Ks" in bands
 
 
-def test_twomass_cone_search_zero_radius(twomass_adapter):
+async def test_twomass_cone_search_zero_radius(twomass_adapter):
     coord = Coordinate(ra=0.0, dec=0.0)
-    result = asyncio.get_event_loop().run_until_complete(
-        twomass_adapter.cone_search(coord, radius_arcsec=0)
-    )
+    result = await twomass_adapter.cone_search(coord, radius_arcsec=0)
     assert result == []
 
 
-def test_twomass_tap_error_returns_empty():
+async def test_twomass_tap_error_returns_empty():
     bad_service = StaticTapService([])
     bad_service.search = MagicMock(side_effect=RuntimeError("IRSA error"))
     adapter = TwoMassTapAdapter(tap_service=bad_service, max_retries=0)
     coord = Coordinate(ra=0.0, dec=0.0)
-    result = asyncio.get_event_loop().run_until_complete(
-        adapter.cone_search(coord, radius_arcsec=30)
-    )
+    result = await adapter.cone_search(coord, radius_arcsec=30)
     assert result == []
 
 
@@ -258,26 +236,20 @@ def test_twomass_requires_pyvo_when_no_service(monkeypatch):
 # lookup.py — two-step enrichment (offline mode)
 # ---------------------------------------------------------------------------
 
-def test_lookup_object_offline_known_object():
+async def test_lookup_object_offline_known_object():
     from astrobridge.lookup import lookup_object
-    result = asyncio.get_event_loop().run_until_complete(
-        lookup_object("Proxima Centauri", live=False)
-    )
+    result = await lookup_object("Proxima Centauri", live=False)
     assert result is not None
     assert "proxima" in result.primary_name.lower() or result.ra == pytest.approx(217.429, abs=1.0)
 
 
-def test_lookup_object_offline_unknown_returns_none():
+async def test_lookup_object_offline_unknown_returns_none():
     from astrobridge.lookup import lookup_object
-    result = asyncio.get_event_loop().run_until_complete(
-        lookup_object("XYZZY_NONEXISTENT_OBJECT_9999", live=False)
-    )
+    result = await lookup_object("XYZZY_NONEXISTENT_OBJECT_9999", live=False)
     assert result is None
 
 
-def test_lookup_by_coordinates_offline():
+async def test_lookup_by_coordinates_offline():
     from astrobridge.lookup import lookup_by_coordinates
-    results = asyncio.get_event_loop().run_until_complete(
-        lookup_by_coordinates(217.429, -62.680, radius_arcsec=120, live=False)
-    )
+    results = await lookup_by_coordinates(217.429, -62.680, radius_arcsec=120, live=False)
     assert isinstance(results, list)

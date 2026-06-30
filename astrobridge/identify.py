@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
-from astrobridge.models import UnifiedObject
+from astrobridge.models import CelestialObject
 from astrobridge.routing import NLPQueryRouter
 from astrobridge.routing.base import CatalogType, ObjectClass
 from astrobridge.routing.intelligent import CatalogRanker
@@ -232,11 +232,13 @@ async def identify_from_catalogs(
     base = identify_object(input_text, router=router)
 
     # 2. Live catalog lookup
-    unified: Optional[UnifiedObject] = await lookup_object(input_text, timeout_sec=timeout_sec)
+    unified: Optional[CelestialObject] = await lookup_object(input_text, timeout_sec=timeout_sec)
 
     # 3. Build description
     if unified is not None and ai_description and _ai_description_is_configured():
         description = generate_description(unified, conn=None)
+    elif unified is not None:
+        description = unified.describe()
     else:
         description = base.description
 
@@ -246,9 +248,12 @@ async def identify_from_catalogs(
             "primary_name": unified.primary_name,
             "ra": unified.ra,
             "dec": unified.dec,
-            "object_type": unified.object_type,
+            "object_type": unified.object_type.value,
+            "raw_classification": unified.raw_classification,
+            "distance_pc": unified.distance_pc,
+            "redshift": unified.redshift,
             "photometry": unified.photometry_summary,
-            "catalogs": list(unified.catalog_entries.keys()) if unified.catalog_entries else [],
+            "catalogs": unified.source_catalogs,
             "alternate_names": unified.alternate_names,
         }
 

@@ -29,7 +29,7 @@ import os
 import sqlite3
 from typing import Optional
 
-from astrobridge.models import UnifiedObject
+from astrobridge.models import CelestialObject
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _build_prompt(obj: UnifiedObject) -> str:
+def _build_prompt(obj: CelestialObject) -> str:
     """Turn a UnifiedObject into a structured prompt for the LLM."""
     lines = [
         f"Name: {obj.primary_name}",
@@ -59,8 +59,9 @@ def _build_prompt(obj: UnifiedObject) -> str:
             f"{band}={mag:.2f}" for band, mag in sorted(obj.photometry_summary.items())
         )
         lines.append(f"Photometry: {mags}")
-    if obj.catalog_entries:
-        lines.append(f"Catalogs: {', '.join(sorted(obj.catalog_entries.keys()))}")
+    catalog_list = sorted(obj.catalog_entries.keys()) if obj.catalog_entries else sorted(obj.source_catalogs)
+    if catalog_list:
+        lines.append(f"Catalogs: {', '.join(catalog_list)}")
     if obj.alternate_names:
         lines.append(f"Also known as: {', '.join(obj.alternate_names)}")
     return "\n".join(lines)
@@ -149,7 +150,7 @@ _DEFAULT_MODELS = {
 # Cache helpers
 # ---------------------------------------------------------------------------
 
-def _cache_key(obj: UnifiedObject) -> str:
+def _cache_key(obj: CelestialObject) -> str:
     """Stable cache key based on object name + coordinates."""
     raw = f"{obj.primary_name}|{obj.ra:.6f}|{obj.dec:.6f}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
@@ -165,8 +166,11 @@ def _fetch_cached(conn: sqlite3.Connection, obj_id: str) -> Optional[str]:
 
 
 def _store_cached(conn: sqlite3.Connection, obj_id: str, description: str) -> None:
-    from astrobridge.database import update_ai_description
-    update_ai_description(conn, obj_id, description)
+    conn.execute(
+        "UPDATE objects SET ai_description = ? WHERE id = ?",
+        (description, obj_id),
+    )
+    conn.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -174,7 +178,7 @@ def _store_cached(conn: sqlite3.Connection, obj_id: str, description: str) -> No
 # ---------------------------------------------------------------------------
 
 def generate_description(
-    obj: UnifiedObject,
+    obj: CelestialObject,
     conn: Optional[sqlite3.Connection] = None,
     force_refresh: bool = False,
 ) -> str:

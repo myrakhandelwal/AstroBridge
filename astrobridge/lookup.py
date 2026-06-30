@@ -31,7 +31,7 @@ import logging
 import os
 from typing import Optional
 
-from astrobridge.models import Coordinate, Source, UnifiedObject
+from astrobridge.models import CelestialObject, Coordinate, Source
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,7 @@ async def lookup_object(
     timeout_sec: float = _DEFAULT_TIMEOUT,
     enrich_radius_arcsec: float = _ENRICH_RADIUS,
     live: bool = True,
-) -> Optional[UnifiedObject]:
+) -> Optional[CelestialObject]:
     """Query real astronomical catalogs and return a merged UnifiedObject.
 
     Uses a two-step strategy:
@@ -149,7 +149,7 @@ async def lookup_object(
 
     Returns
     -------
-    UnifiedObject or None
+    CelestialObject or None
     """
     # Step 1: name resolution via SIMBAD + NED
     resolvers = _name_resolvers(live)
@@ -167,8 +167,8 @@ async def lookup_object(
     all_sources = list(name_sources)
 
     if enrichers:
-        # Use the first returned source as the reference position
-        ref_src = name_sources[0]
+        # Use best available position as the enrichment center
+        ref_src = min(name_sources, key=lambda s: s.uncertainty.ra_error + s.uncertainty.dec_error)
         coord = Coordinate(ra=ref_src.coordinate.ra, dec=ref_src.coordinate.dec)
         enrich_batches: list[list[Source]] = await asyncio.gather(
             *[_cone_one(c, coord, enrich_radius_arcsec, timeout_sec) for c in enrichers]
@@ -176,7 +176,7 @@ async def lookup_object(
         for batch in enrich_batches:
             all_sources.extend(batch)
 
-    return UnifiedObject.from_sources(all_sources)
+    return CelestialObject.from_sources(all_sources)
 
 
 async def lookup_by_coordinates(
@@ -185,7 +185,7 @@ async def lookup_by_coordinates(
     radius_arcsec: float = 60.0,
     timeout_sec: float = _DEFAULT_TIMEOUT,
     live: bool = True,
-) -> list[UnifiedObject]:
+) -> list[CelestialObject]:
     """Cone-search all catalogs around (RA, Dec) and return merged objects.
 
     Queries SIMBAD, NED, Gaia DR3, and 2MASS concurrently.
@@ -203,12 +203,11 @@ async def lookup_by_coordinates(
 
     Returns
     -------
-    list[UnifiedObject]
-        One UnifiedObject per distinct sky position found.
+    list[CelestialObject]
+        One CelestialObject per distinct sky position found.
     """
     coord = Coordinate(ra=ra, dec=dec)
 
-    # All connectors support cone search
     all_connectors = _name_resolvers(live) + _position_enrichers(live)
 
     per_catalog = await asyncio.gather(
@@ -220,4 +219,4 @@ async def lookup_by_coordinates(
         return []
 
     clusters = _cluster_sources(all_sources)
-    return [UnifiedObject.from_sources(c) for c in clusters]
+    return [CelestialObject.from_sources(c) for c in clusters]
